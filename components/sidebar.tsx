@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronLeft, LayoutDashboard, BookOpen, Award, Eye, Shield } from 'lucide-react';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface SidebarProps {
   className?: string;

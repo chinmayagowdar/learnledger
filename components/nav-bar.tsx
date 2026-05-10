@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 import { toast } from 'sonner';
 
 export default function NavBar() {

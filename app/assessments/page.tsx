@@ -7,7 +7,7 @@ import { ArrowLeft, Award } from 'lucide-react';
 import SkillSelector from '@/components/skill-selector';
 import RoundStepper from '@/components/round-stepper';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 import { type Skill, getAllRoundsCompleted, SKILL_LIST } from '@/lib/skills';
 
 export default function AssessmentsPage() {

@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Lock, CheckCircle } from 'lucide-react';
 import { SKILL_LIST, type Skill, isRoundUnlocked, getAllRoundsCompleted } from '@/lib/skills';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 import { cn } from '@/lib/utils';
 
 interface SkillSelectorProps {

@@ -8,7 +8,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 import { toast } from 'sonner';
 
 export default function LoginPage() {

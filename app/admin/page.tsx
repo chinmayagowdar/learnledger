@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Users, Award, BookOpen, Shield, Search, Filter, CheckCircle, RotateCcw } from 'lucide-react';
 import { collection, getDocs, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 import type { AppUser } from '@/lib/auth';
 import { SKILL_LIST, getAllRoundsCompleted, type SkillId } from '@/lib/skills';
 import { Button } from '@/components/ui/button';

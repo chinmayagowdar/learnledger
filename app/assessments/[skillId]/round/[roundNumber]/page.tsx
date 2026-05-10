@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import Timer from '@/components/timer';
 import CodeEditor from '@/components/code-editor';
 import CameraApproval from '@/components/camera-approval';
-import { useAuth } from '@/components/auth-provider';
+import { useAuth } from '@/providers/AuthProvider';
 import { getSkillById, type Skill, type RoundConfig } from '@/lib/skills';
 import { getSkillQuestionsForRound, getCodingProblemsForSkill, type CodingProblem } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
