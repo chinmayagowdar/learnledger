@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PISTON_API = 'https://emkc.org/api/v2/piston/execute';
+const PISTON_API = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston/execute';
 
 interface ExecuteRequest {
   language: string;

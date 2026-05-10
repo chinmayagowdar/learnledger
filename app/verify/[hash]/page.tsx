@@ -1,21 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Copy, Share2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCredentialByHash } from '@/lib/firebase-helpers';
-import { formatHashForDisplay, getCredentialStatus } from '@/lib/blockchain-utils';
+import { getCredentialByHash, incrementCredentialViews } from '@/lib/firebase-helpers';
+import { getCredentialStatus } from '@/lib/blockchain-utils';
 import SkeletonLoader from '@/components/skeleton-loader';
 
-interface VerificationPageProps {
-  params: {
-    hash: string;
-  };
-}
-
-export default function VerificationPage({ params }: VerificationPageProps) {
-  const { hash } = params;
+export default function VerificationPage() {
+  const params = useParams();
+  const hash = params.hash as string;
   const [credential, setCredential] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,33 +19,39 @@ export default function VerificationPage({ params }: VerificationPageProps) {
 
   useEffect(() => {
     const fetchCredential = async () => {
+      if (!hash) {
+        setError('No credential hash provided.');
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Try to get from Firebase, fallback to mock data
-        let cred = await getCredentialByHash(hash).catch(() => null);
+        // Try to get from Firebase
+        const cred = await getCredentialByHash(hash);
 
         if (!cred) {
-          // Mock data for demo
-          cred = {
-            id: `cred-${hash}`,
-            skillTitle: 'React Advanced',
-            blockchainHash: hash,
-            score: 92,
-            isVerified: true,
-            issuedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-            expiresAt: new Date(Date.now() + 335 * 24 * 60 * 60 * 1000).toISOString(),
-            recipientName: 'Credential Holder',
-            views: 42,
-            rounds: [
-              { round: 1, score: 85, percentage: 85 },
-              { round: 2, score: 92, percentage: 92 },
-              { round: 3, score: 98, percentage: 98 },
-            ],
-          };
+          setError('Credential not found. The hash may be invalid or the credential does not exist.');
+          setLoading(false);
+          return;
         }
 
-        setCredential(cred);
+        // Increment views
+        if (cred.id) {
+          await incrementCredentialViews(cred.id).catch(() => {});
+        }
+
+        // Transform Firestore timestamps to dates
+        const transformedCred = {
+          ...cred,
+          issuedAt: cred.issuedAt?.toDate?.() || new Date(cred.issuedAt),
+          expiresAt: cred.expiresAt?.toDate?.() || new Date(cred.expiresAt),
+          recipientName: 'Verified Credential Holder',
+          score: cred.rounds?.reduce((acc: number, r: { percentage: number }) => acc + r.percentage, 0) / (cred.rounds?.length || 1),
+        };
+
+        setCredential(transformedCred);
       } catch (err) {
-        setError('Failed to verify credential. The credential might not exist.');
+        setError('Failed to verify credential. Please try again later.');
         console.error('Error fetching credential:', err);
       } finally {
         setLoading(false);

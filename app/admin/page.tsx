@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Users, Award, BookOpen, Shield, Search, Filter, ChevronDown, CheckCircle } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { Users, Award, BookOpen, Shield, Search, Filter, CheckCircle, RotateCcw } from 'lucide-react';
+import { collection, getDocs, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/auth-provider';
 import type { AppUser } from '@/lib/auth';
@@ -140,6 +140,56 @@ export default function AdminPage() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleResetUserSkill = async (userId: string, skillId: SkillId) => {
+    if (!db) return;
+    
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userToUpdate = users.find(u => u.uid === userId);
+      if (!userToUpdate) return;
+
+      const updatedSkills = { ...userToUpdate.skills };
+      if (updatedSkills[skillId]) {
+        updatedSkills[skillId] = { roundsCompleted: [] };
+      }
+
+      await updateDoc(userRef, { skills: updatedSkills });
+
+      // Update local state
+      setUsers(prev => prev.map(u => {
+        if (u.uid === userId) {
+          const newSkills = { ...u.skills, [skillId]: { roundsCompleted: [] } };
+          const completedSkillsCount = Object.values(newSkills).filter(
+            (s: any) => getAllRoundsCompleted(s?.roundsCompleted || [])
+          ).length;
+          const inProgressSkillsCount = Object.values(newSkills).filter(
+            (s: any) => {
+              const rounds = s?.roundsCompleted || [];
+              return rounds.length > 0 && !getAllRoundsCompleted(rounds);
+            }
+          ).length;
+          const totalRoundsCompleted = Object.values(newSkills).reduce(
+            (acc: number, s: any) => acc + (s?.roundsCompleted?.length || 0), 0
+          );
+
+          return {
+            ...u,
+            skills: newSkills,
+            completedSkillsCount,
+            inProgressSkillsCount,
+            totalRoundsCompleted,
+          };
+        }
+        return u;
+      }));
+
+      toast.success(`Reset ${skillId} progress for user`);
+    } catch (error) {
+      console.error('Error resetting skill:', error);
+      toast.error('Failed to reset skill progress');
+    }
   };
 
   const getSkillProgressBadges = (userSkills: Record<string, unknown>) => {
@@ -327,6 +377,7 @@ export default function AdminPage() {
                     <TableHead className="text-center">Completed</TableHead>
                     <TableHead className="text-center">In Progress</TableHead>
                     <TableHead>Joined</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -381,6 +432,28 @@ export default function AdminPage() {
                         <span className="text-sm text-muted-foreground">
                           {u.createdAt.toLocaleDateString()}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          onValueChange={(skillId) => handleResetUserSkill(u.uid, skillId as SkillId)}
+                        >
+                          <SelectTrigger className="w-[140px] h-8">
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            <SelectValue placeholder="Reset skill" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SKILL_LIST.map((skill) => {
+                              const progress = u.skills?.[skill.id] as { roundsCompleted?: number[] } | undefined;
+                              const hasProgress = (progress?.roundsCompleted?.length || 0) > 0;
+                              if (!hasProgress) return null;
+                              return (
+                                <SelectItem key={skill.id} value={skill.id}>
+                                  {skill.name}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                     </TableRow>
                   ))}

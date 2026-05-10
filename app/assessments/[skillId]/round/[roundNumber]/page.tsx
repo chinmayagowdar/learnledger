@@ -13,6 +13,10 @@ import { getSkillById, type Skill, type RoundConfig } from '@/lib/skills';
 import { getSkillQuestionsForRound, getCodingProblemsForSkill, type CodingProblem } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { doc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { storeCredentialHash } from '@/lib/blockchain';
+import { createCredential } from '@/lib/firebase-helpers';
 import type { Question } from '@/lib/store';
 
 type RoundNumber = 1 | 2 | 3;
@@ -41,6 +45,12 @@ export default function RoundPage() {
   const [codingProblems, setCodingProblems] = useState<CodingProblem[]>([]);
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [codingResults, setCodingResults] = useState<boolean[]>([]);
+
+  // Camera denial state
+  const [cameraDenied, setCameraDenied] = useState(false);
+
+  // Track round results for credential
+  const [roundScores, setRoundScores] = useState<Array<{ round: number; score: number; percentage: number }>>([]);
 
   useEffect(() => {
     const foundSkill = getSkillById(skillId);
@@ -115,7 +125,7 @@ export default function RoundPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (roundConfig?.type === 'coding') {
       const passedCount = codingResults.filter(Boolean).length;
       const percentage = (passedCount / codingProblems.length) * 100;
@@ -124,11 +134,10 @@ export default function RoundPage() {
       // Clear saved state
       localStorage.removeItem(`quiz-${skillId}-${roundNumber}`);
 
-      if (passed) {
+      if (passed && user && db) {
         toast.success(`Round ${roundNumber} completed! Score: ${percentage.toFixed(0)}%`);
-        // TODO: Update user progress in Firestore
-        router.push(`/assessments?skill=${skillId}&completed=${roundNumber}`);
-      } else {
+        await saveRoundProgressAndCheckCredential(passedCount, percentage);
+      } else if (!passed) {
         toast.error(`You need ${roundConfig.passingScore}% to pass. Try again!`);
         setShowResults(true);
       }
@@ -146,11 +155,91 @@ export default function RoundPage() {
 
       setShowResults(true);
 
-      if (passed) {
+      if (passed && user && db) {
         toast.success(`Round ${roundNumber} completed! Score: ${percentage.toFixed(0)}%`);
-      } else {
+        await saveRoundProgressAndCheckCredential(correctCount, percentage);
+      } else if (!passed) {
         toast.error(`You need ${roundConfig?.passingScore}% to pass. Your score: ${percentage.toFixed(0)}%`);
       }
+    }
+  };
+
+  const saveRoundProgressAndCheckCredential = async (score: number, percentage: number) => {
+    if (!user || !db || !skill) return;
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) return;
+
+      const userData = userDoc.data();
+      const skills = userData.skills || {};
+      const skillProgress = skills[skillId] || { roundsCompleted: [] };
+      const roundsCompleted = skillProgress.roundsCompleted || [];
+
+      // Add this round if not already completed
+      if (!roundsCompleted.includes(roundNumber)) {
+        roundsCompleted.push(roundNumber);
+        roundsCompleted.sort((a: number, b: number) => a - b);
+      }
+
+      // Update user skills in Firestore
+      await updateDoc(userRef, {
+        [`skills.${skillId}`]: { roundsCompleted },
+      });
+
+      // Store round score for credential
+      const newRoundScores = [...roundScores, { round: roundNumber, score, percentage }];
+      setRoundScores(newRoundScores);
+
+      // Check if all 3 rounds are completed
+      if (roundsCompleted.length === 3) {
+        toast.loading('Generating your credential...');
+
+        // Generate credential
+        const credentialId = `cred-${user.uid}-${skillId}-${Date.now()}`;
+        const avgScore = newRoundScores.reduce((acc, r) => acc + r.percentage, 0) / 3;
+
+        // Store on blockchain
+        const blockchainResult = await storeCredentialHash({
+          credentialId,
+          recipientId: user.uid,
+          skillId,
+          skillName: skill.name,
+          score: avgScore,
+          rounds: newRoundScores,
+        });
+
+        // Create credential in Firestore
+        const expiresAt = new Date();
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+        await createCredential({
+          userId: user.uid,
+          skillId,
+          skillTitle: skill.name,
+          blockchainHash: blockchainResult.blockchainHash,
+          rounds: newRoundScores,
+          issuedAt: Timestamp.now(),
+          expiresAt: Timestamp.fromDate(expiresAt),
+          isVerified: true,
+          views: 0,
+          shareCount: 0,
+        });
+
+        toast.dismiss();
+        toast.success('Credential issued successfully!');
+        
+        // Redirect to credentials page
+        router.push(`/credentials?new=${blockchainResult.blockchainHash}`);
+      } else {
+        // Redirect back to assessments for next round
+        router.push(`/assessments?skill=${skillId}&completed=${roundNumber}`);
+      }
+    } catch (error) {
+      console.error('Error saving progress:', error);
+      toast.error('Failed to save progress. Please try again.');
     }
   };
 
@@ -173,11 +262,49 @@ export default function RoundPage() {
         onApprove={() => {
           sessionStorage.setItem('camera-approved', 'true');
           setCameraApproved(true);
+          setCameraDenied(false);
         }}
         onDeny={() => {
-          router.push('/assessments');
+          setCameraDenied(true);
         }}
       />
+    );
+  }
+
+  // Show camera denied error - strict enforcement
+  if (cameraDenied) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-lg w-full glass p-8 rounded-xl text-center"
+        >
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-destructive flex items-center justify-center">
+            <XCircle className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Camera Access Required</h1>
+          <p className="text-muted-foreground mb-6">
+            This is a proctored assessment. You cannot proceed without enabling your camera.
+            Camera access is strictly required to ensure assessment integrity.
+          </p>
+          <div className="space-y-3">
+            <Button
+              onClick={() => setCameraDenied(false)}
+              className="w-full gradient-primary text-white"
+            >
+              Try Again
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleReturnToAssessments}
+              className="w-full"
+            >
+              Return to Assessments
+            </Button>
+          </div>
+        </motion.div>
+      </div>
     );
   }
 
