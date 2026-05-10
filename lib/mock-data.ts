@@ -1,5 +1,5 @@
 import { Assessment, Question, Credential, User } from './store';
-import { generateBlockchainHash, generateWalletAddress } from './blockchain';
+import { generateBlockchainHash } from './blockchain';
 
 export const mockUser: User = {
   id: 'user-123',
@@ -7,8 +7,8 @@ export const mockUser: User = {
   email: 'alex@example.com',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
   joinedAt: '2024-01-15',
-  totalCredentials: 4,
-  totalAssessments: 6,
+  totalCredentials: 2,
+  totalAssessments: 4,
 };
 
 export const mockAssessments: Assessment[] = [

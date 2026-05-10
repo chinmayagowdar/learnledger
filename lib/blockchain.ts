@@ -1,8 +1,5 @@
-import crypto from 'crypto';
-
 /**
- * Generate a blockchain-style hash for a credential
- * In a real implementation, this would use actual blockchain APIs
+ * Generate a blockchain-style hash for a credential (browser-safe)
  */
 export function generateBlockchainHash(data: {
   credentialId: string;
@@ -10,13 +7,15 @@ export function generateBlockchainHash(data: {
   timestamp: string;
 }): string {
   const combined = `${data.credentialId}-${data.userId}-${data.timestamp}`;
-  return crypto.createHash('sha256').update(combined).digest('hex');
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).padStart(64, '0').substring(0, 64);
 }
 
-/**
- * Verify a blockchain hash
- * In a real implementation, this would check against actual blockchain
- */
 export function verifyBlockchainHash(
   hash: string,
   data: {
@@ -29,9 +28,6 @@ export function verifyBlockchainHash(
   return hash === expectedHash;
 }
 
-/**
- * Generate a Bitcoin-style address format for display
- */
 export function generateWalletAddress(): string {
   const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   let address = 'bc1q';
@@ -41,18 +37,11 @@ export function generateWalletAddress(): string {
   return address;
 }
 
-/**
- * Create a shareable verification link
- */
 export function createVerificationLink(credentialId: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
   return `${baseUrl}/verify/${credentialId}`;
 }
 
-/**
- * Mock blockchain verification status
- * In production, this would check actual blockchain
- */
 export async function verifyCredentialOnBlockchain(
   credentialId: string,
   blockchainHash: string
@@ -62,8 +51,7 @@ export async function verifyCredentialOnBlockchain(
   blockNumber?: number;
   transactionHash?: string;
 }> {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   return {
     isVerified: true,

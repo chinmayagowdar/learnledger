@@ -22,7 +22,8 @@ export default function RoundProgress({
   const displayRounds = rounds.length > 0 ? rounds : Array.from({ length: totalRounds }, (_, i) => ({
     round: i + 1,
     completed: i < currentRound - 1,
-    score: i < currentRound - 1 ? undefined : undefined,
+    score: undefined as number | undefined,
+    percentage: undefined as number | undefined,
   }));
 
   return (

@@ -21,19 +21,19 @@ interface ModernChartProps {
 export default function ModernChart({
   title = 'Learning Progress',
   subtitle = 'Last 6 weeks of activity',
-  height = 400,
+  height = 350,
 }: ModernChartProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, translateY: 4 }}
+      whileInView={{ opacity: 1, translateY: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.6 }}
-      className="glass p-8 rounded-xl"
+      transition={{ duration: 0.4 }}
+      className="glass p-6 rounded-md"
     >
-      <div className="mb-6">
-        <h3 className="text-xl font-bold mb-1">{title}</h3>
-        <p className="text-sm text-foreground/60">{subtitle}</p>
+      <div className="mb-5">
+        <h3 className="text-lg font-semibold mb-0.5">{title}</h3>
+        <p className="text-xs text-foreground/50">{subtitle}</p>
       </div>
 
       <ResponsiveContainer width="100%" height={height}>
@@ -43,54 +43,58 @@ export default function ModernChart({
         >
           <defs>
             <linearGradient id="colorCompletions" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="rgb(84, 153, 255)" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="rgb(84, 153, 255)" stopOpacity={0.1}/>
+              <stop offset="5%" stopColor="#1E3A8A" stopOpacity={0.6}/>
+              <stop offset="95%" stopColor="#1E3A8A" stopOpacity={0.05}/>
             </linearGradient>
             <linearGradient id="colorCredentials" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="rgb(147, 112, 219)" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="rgb(147, 112, 219)" stopOpacity={0.1}/>
+              <stop offset="5%" stopColor="#0D9488" stopOpacity={0.6}/>
+              <stop offset="95%" stopColor="#0D9488" stopOpacity={0.05}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-          <XAxis dataKey="name" stroke="currentColor" style={{ fontSize: '12px' }} />
-          <YAxis stroke="currentColor" style={{ fontSize: '12px' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+          <XAxis dataKey="name" stroke="currentColor" style={{ fontSize: '11px' }} />
+          <YAxis stroke="currentColor" style={{ fontSize: '11px' }} />
           <Tooltip
             contentStyle={{
-              backgroundColor: 'rgba(20, 20, 40, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '8px',
-              padding: '8px 12px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '12px',
             }}
             labelStyle={{ color: '#fff' }}
           />
           <Area
             type="monotone"
             dataKey="completions"
-            stroke="rgb(84, 153, 255)"
+            stroke="#1E3A8A"
             fillOpacity={1}
             fill="url(#colorCompletions)"
             name="Assessments"
+            animationDuration={800}
+            animationEasing="linear"
           />
           <Area
             type="monotone"
             dataKey="credentials"
-            stroke="rgb(147, 112, 219)"
+            stroke="#0D9488"
             fillOpacity={1}
             fill="url(#colorCredentials)"
             name="Credentials"
+            animationDuration={800}
+            animationEasing="linear"
           />
         </AreaChart>
       </ResponsiveContainer>
 
-      {/* Legend */}
-      <div className="flex gap-6 mt-6 text-sm">
+      <div className="flex gap-6 mt-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[rgb(84,153,255)]" />
-          <span>Assessments Completed</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-[#1E3A8A]" />
+          <span className="text-foreground/60">Assessments Completed</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-[rgb(147,112,219)]" />
-          <span>Credentials Earned</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-[#0D9488]" />
+          <span className="text-foreground/60">Credentials Earned</span>
         </div>
       </div>
     </motion.div>

@@ -9,7 +9,7 @@ interface StatsCardProps {
   value: string | number;
   subtext?: string;
   delay?: number;
-  gradient?: 'purple' | 'blue';
+  gradient?: 'primary' | 'accent';
 }
 
 export default function StatsCard({
@@ -18,28 +18,25 @@ export default function StatsCard({
   value,
   subtext,
   delay = 0,
-  gradient = 'purple',
+  gradient = 'primary',
 }: StatsCardProps) {
-  const gradientClass = gradient === 'purple' ? 'gradient-primary' : 'gradient-accent';
+  const gradientClass = gradient === 'primary' ? 'gradient-primary' : 'gradient-accent';
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, translateY: 4 }}
+      whileInView={{ opacity: 1, translateY: 0 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.5, delay }}
-      className="glass p-6 rounded-xl hover:shadow-lg transition-all duration-300 group"
+      transition={{ duration: 0.3, delay }}
+      className="glass p-5 rounded-md hover:border-primary/20 transition-all duration-200 group"
     >
-      {/* Gradient background accent */}
-      <div className={`absolute inset-0 rounded-xl ${gradientClass} opacity-0 group-hover:opacity-10 transition-opacity duration-300 -z-10`} />
-
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-foreground/60 text-sm font-medium mb-2">{label}</p>
-          <p className="text-3xl font-bold text-foreground mb-1">{value}</p>
-          {subtext && <p className="text-foreground/50 text-xs">{subtext}</p>}
+          <p className="text-foreground/50 text-xs font-medium uppercase tracking-wider mb-1.5">{label}</p>
+          <p className="text-2xl font-semibold text-foreground mb-0.5">{value}</p>
+          {subtext && <p className="text-foreground/40 text-xs">{subtext}</p>}
         </div>
-        <div className="text-primary p-3 rounded-lg glass-dark">
+        <div className="text-primary p-2.5 rounded-md glass-dark">
           {icon}
         </div>
       </div>

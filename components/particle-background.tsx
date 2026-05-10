@@ -23,7 +23,6 @@ export default function ParticleBackground() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -32,23 +31,22 @@ export default function ParticleBackground() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Initialize particles
     const colors = [
-      'rgba(84, 153, 255, 0.5)',
-      'rgba(147, 112, 219, 0.5)',
-      'rgba(138, 126, 255, 0.5)',
+      'rgba(30, 58, 138, 0.3)',
+      'rgba(13, 148, 136, 0.3)',
+      'rgba(79, 70, 229, 0.2)',
     ];
 
     const initParticles = () => {
       particlesRef.current = [];
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 30; i++) {
         particlesRef.current.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
-          vx: (Math.random() - 0.5) * 2,
-          vy: (Math.random() - 0.5) * 2,
-          size: Math.random() * 3 + 1,
-          opacity: Math.random() * 0.5 + 0.3,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          size: Math.random() * 2 + 0.5,
+          opacity: Math.random() * 0.3 + 0.1,
           color: colors[Math.floor(Math.random() * colors.length)],
         });
       }
@@ -56,16 +54,13 @@ export default function ParticleBackground() {
 
     initParticles();
 
-    // Animation loop
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       particlesRef.current.forEach((particle) => {
-        // Update position
         particle.x += particle.vx;
         particle.y += particle.vy;
 
-        // Bounce off walls
         if (particle.x < 0 || particle.x > canvas.width) {
           particle.vx *= -1;
           particle.x = Math.max(0, Math.min(canvas.width, particle.x));
@@ -75,14 +70,12 @@ export default function ParticleBackground() {
           particle.y = Math.max(0, Math.min(canvas.height, particle.y));
         }
 
-        // Draw particle
         ctx.fillStyle = particle.color;
         ctx.beginPath();
         ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // Draw connections
       particlesRef.current.forEach((particle, i) => {
         for (let j = i + 1; j < particlesRef.current.length; j++) {
           const other = particlesRef.current[j];
@@ -90,9 +83,9 @@ export default function ParticleBackground() {
           const dy = other.y - particle.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < 100) {
-            ctx.strokeStyle = `rgba(147, 112, 219, ${0.2 * (1 - distance / 100)})`;
-            ctx.lineWidth = 1;
+          if (distance < 120) {
+            ctx.strokeStyle = `rgba(30, 58, 138, ${0.08 * (1 - distance / 120)})`;
+            ctx.lineWidth = 0.5;
             ctx.beginPath();
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(other.x, other.y);
@@ -114,7 +107,7 @@ export default function ParticleBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 -z-10 bg-gradient-to-br from-background via-background to-muted"
+      className="fixed inset-0 -z-10 bg-gradient-to-br from-background via-background to-muted/30"
     />
   );
 }

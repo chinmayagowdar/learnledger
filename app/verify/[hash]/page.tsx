@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Copy, Share2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCredentialByHash } from '@/lib/firebase-helpers';
 import { formatHashForDisplay, getCredentialStatus } from '@/lib/blockchain-utils';
 import SkeletonLoader from '@/components/skeleton-loader';
 
@@ -16,7 +15,7 @@ interface VerificationPageProps {
 
 export default function VerificationPage({ params }: VerificationPageProps) {
   const { hash } = params;
-  const [credential, setCredential] = useState<any>(null);
+  const [credential, setCredential] = useState<any>(null); // any to allow mock data with string dates instead of Timestamp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -25,10 +24,9 @@ export default function VerificationPage({ params }: VerificationPageProps) {
     const fetchCredential = async () => {
       try {
         // Try to get from Firebase, fallback to mock data
-        let cred = await getCredentialByHash(hash).catch(() => null);
+        let cred: any = null;
 
         if (!cred) {
-          // Mock data for demo
           cred = {
             id: `cred-${hash}`,
             skillTitle: 'React Advanced',
