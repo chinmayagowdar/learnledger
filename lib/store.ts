@@ -23,15 +23,6 @@ export interface Question {
   explanation: string;
 }
 
-export interface CodingProblem {
-  id: string;
-  title: string;
-  description: string;
-  starterCode: string;
-  testCases: Array<{ input: string; expected: string }>;
-  language: string;
-}
-
 export interface Credential {
   id: string;
   title: string;
@@ -64,14 +55,14 @@ export interface RoundResult {
   percentage: number;
   passed: boolean;
   timestamp: string;
-  roundType: 'mcq' | 'coding' | 'proctored';
-  cameraApproved: boolean;
 }
 
 interface LearnLedgerStore {
+  // User state
   user: User | null;
   setUser: (user: User | null) => void;
 
+  // Assessment state
   assessments: Assessment[];
   currentAssessment: Assessment | null;
   assessmentQuestions: Question[];
@@ -80,11 +71,13 @@ interface LearnLedgerStore {
   setAssessmentQuestions: (questions: Question[]) => void;
   updateAssessmentStatus: (assessmentId: string, status: Assessment['status'], score?: number) => void;
 
+  // Credential state
   credentials: Credential[];
   setCredentials: (credentials: Credential[]) => void;
   addCredential: (credential: Credential) => void;
   incrementCredentialViews: (credentialId: string) => void;
 
+  // Multi-round state
   currentSkill: string | null;
   currentRound: number;
   roundResults: RoundResult[];
@@ -94,6 +87,7 @@ interface LearnLedgerStore {
   addRoundResult: (result: RoundResult) => void;
   resetMultiRound: () => void;
 
+  // Quiz state
   currentQuestionIndex: number;
   answers: number[];
   setCurrentQuestionIndex: (index: number) => void;
@@ -101,25 +95,19 @@ interface LearnLedgerStore {
   addAnswer: (answer: number) => void;
   resetQuiz: () => void;
 
-  cameraApproved: boolean;
-  setCameraApproved: (approved: boolean) => void;
-
+  // Loading state
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
-
-  guestMode: boolean;
-  setGuestMode: (guest: boolean) => void;
-
-  authRole: 'user' | 'admin' | null;
-  setAuthRole: (role: 'user' | 'admin' | null) => void;
 }
 
 export const useLearnLedgerStore = create<LearnLedgerStore>()(
   persist(
     (set) => ({
+      // User
       user: null,
       setUser: (user) => set({ user }),
 
+      // Assessments
       assessments: [],
       currentAssessment: null,
       assessmentQuestions: [],
@@ -140,6 +128,7 @@ export const useLearnLedgerStore = create<LearnLedgerStore>()(
           ),
         })),
 
+      // Credentials
       credentials: [],
       setCredentials: (credentials) => set({ credentials }),
       addCredential: (credential) =>
@@ -153,6 +142,7 @@ export const useLearnLedgerStore = create<LearnLedgerStore>()(
           ),
         })),
 
+      // Multi-round
       currentSkill: null,
       currentRound: 1,
       roundResults: [],
@@ -168,9 +158,9 @@ export const useLearnLedgerStore = create<LearnLedgerStore>()(
           currentSkill: null,
           currentRound: 1,
           roundResults: [],
-          cameraApproved: false,
         }),
 
+      // Quiz
       currentQuestionIndex: 0,
       answers: [],
       setCurrentQuestionIndex: (index) => set({ currentQuestionIndex: index }),
@@ -187,17 +177,9 @@ export const useLearnLedgerStore = create<LearnLedgerStore>()(
           assessmentQuestions: [],
         }),
 
-      cameraApproved: false,
-      setCameraApproved: (approved) => set({ cameraApproved: approved }),
-
+      // Loading
       isLoading: false,
       setIsLoading: (loading) => set({ isLoading: loading }),
-
-      guestMode: true,
-      setGuestMode: (guest) => set({ guestMode: guest }),
-
-      authRole: null,
-      setAuthRole: (role) => set({ authRole: role }),
     }),
     {
       name: 'learnledger-store',

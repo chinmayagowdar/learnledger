@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       id: `cred-${Date.now()}`,
       userId,
       skill,
-      title: skill.replace(/-/g, ' ').replace(/\b\w/g, (char: string) => char.toUpperCase()),
+      title: skill.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
       blockchainHash: hash,
       rounds: rounds.map((r: RoundResult) => ({
         round: r.round,

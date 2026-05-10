@@ -14,7 +14,8 @@ export default function SkeletonLoader({ className = '', count = 1 }: SkeletonLo
         <div
           key={i}
           className={cn(
-            'rounded-md bg-muted/50 animate-pulse',
+            'rounded-lg bg-gradient-to-r from-muted via-background to-muted',
+            'animate-shimmer bg-[length:1000px_100%]',
             className
           )}
         />

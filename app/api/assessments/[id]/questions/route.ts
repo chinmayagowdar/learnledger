@@ -3,10 +3,10 @@ import { mockQuestions } from '@/lib/mock-data';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id: assessmentId } = await params;
+    const assessmentId = params.id;
     const questions = mockQuestions[assessmentId as keyof typeof mockQuestions] || [];
 
     return NextResponse.json({
