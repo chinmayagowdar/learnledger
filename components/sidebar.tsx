@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronLeft, LayoutDashboard, BookOpen, Award, Eye } from 'lucide-react';
+import { ChevronLeft, LayoutDashboard, BookOpen, Award, Eye, Shield } from 'lucide-react';
+import { useAuth } from '@/components/auth-provider';
 
 interface SidebarProps {
   className?: string;
@@ -13,6 +14,7 @@ interface SidebarProps {
 export default function Sidebar({ className = '' }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
+  const { isAdmin } = useAuth();
 
   const navItems = [
     { href: '/', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', segment: '/' },
@@ -20,6 +22,16 @@ export default function Sidebar({ className = '' }: SidebarProps) {
     { href: '/credentials', icon: <Award className="w-5 h-5" />, label: 'Credentials', segment: 'credentials' },
     { href: '/', icon: <Eye className="w-5 h-5" />, label: 'Employer View', segment: 'employer' },
   ];
+
+  // Add admin link for admin users
+  if (isAdmin) {
+    navItems.push({
+      href: '/admin',
+      icon: <Shield className="w-5 h-5" />,
+      label: 'Admin',
+      segment: 'admin',
+    });
+  }
 
   const isActive = (segment: string) => {
     if (segment === '/') return pathname === '/';
@@ -48,7 +60,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
           const active = isActive(item.segment);
           return (
             <Link
-              key={item.href}
+              key={item.segment}
               href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 relative group ${
                 active

@@ -1,51 +1,40 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import AssessmentCard from '@/components/assessment-card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-const assessments = [
-  {
-    id: 'react-advanced',
-    title: 'React Advanced',
-    description: 'Master advanced React patterns and hooks',
-    progress: 100,
-    status: 'completed' as const,
-    duration: '15 min',
-    questions: 5,
-  },
-  {
-    id: 'js-mastery',
-    title: 'JavaScript Mastery',
-    description: 'Deep dive into JavaScript fundamentals',
-    progress: 65,
-    status: 'in-progress' as const,
-    duration: '20 min',
-    questions: 5,
-  },
-  {
-    id: 'typescript-pro',
-    title: 'TypeScript Pro',
-    description: 'Advanced TypeScript patterns and types',
-    progress: 30,
-    status: 'in-progress' as const,
-    duration: '18 min',
-    questions: 5,
-  },
-  {
-    id: 'web-performance',
-    title: 'Web Performance',
-    description: 'Optimize web applications for speed',
-    progress: 0,
-    status: 'pending' as const,
-    duration: '25 min',
-    questions: 5,
-  },
-];
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Award } from 'lucide-react';
+import SkillSelector from '@/components/skill-selector';
+import RoundStepper from '@/components/round-stepper';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/components/auth-provider';
+import { type Skill, getAllRoundsCompleted, SKILL_LIST } from '@/lib/skills';
 
 export default function AssessmentsPage() {
-  const completedCount = assessments.filter(a => a.status === 'completed').length;
-  const inProgressCount = assessments.filter(a => a.status === 'in-progress').length;
+  const router = useRouter();
+  const { user } = useAuth();
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+
+  const getSkillProgress = (skillId: string) => {
+    if (!user || !user.skills) return [];
+    const progress = user.skills[skillId];
+    return progress?.roundsCompleted || [];
+  };
+
+  const completedSkillsCount = SKILL_LIST.filter((skill) => {
+    const completedRounds = getSkillProgress(skill.id);
+    return getAllRoundsCompleted(completedRounds);
+  }).length;
+
+  const inProgressCount = SKILL_LIST.filter((skill) => {
+    const completedRounds = getSkillProgress(skill.id);
+    return completedRounds.length > 0 && !getAllRoundsCompleted(completedRounds);
+  }).length;
+
+  const handleStartRound = (roundNumber: 1 | 2 | 3) => {
+    if (!selectedSkill) return;
+    router.push(`/assessments/${selectedSkill.id}/round/${roundNumber}`);
+  };
 
   return (
     <div className="min-h-screen space-y-8">
@@ -54,97 +43,145 @@ export default function AssessmentsPage() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
           className="space-y-4 mb-8"
         >
-          <h1 className="text-4xl sm:text-5xl font-bold">Assessments</h1>
-          <p className="text-lg text-foreground/70 max-w-2xl">
-            Take assessments to validate your skills and earn verified credentials.
-          </p>
+          <div className="flex items-center gap-4">
+            {selectedSkill && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedSkill(null)}
+                className="rounded-lg"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            )}
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
+                {selectedSkill ? selectedSkill.name : 'Skill Assessments'}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {selectedSkill
+                  ? selectedSkill.description
+                  : 'Select a skill to begin your assessment journey'}
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="glass p-6 rounded-xl"
-          >
-            <p className="text-foreground/60 text-sm mb-1">Completed</p>
-            <p className="text-3xl font-bold">{completedCount}</p>
-          </motion.div>
+        {!selectedSkill && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="glass p-6 rounded-xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <Award className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-sm">Completed Skills</p>
+                  <p className="text-2xl font-bold text-foreground">{completedSkillsCount}</p>
+                </div>
+              </div>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="glass p-6 rounded-xl"
-          >
-            <p className="text-foreground/60 text-sm mb-1">In Progress</p>
-            <p className="text-3xl font-bold">{inProgressCount}</p>
-          </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="glass p-6 rounded-xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-sm">In Progress</p>
+                  <p className="text-2xl font-bold text-foreground">{inProgressCount}</p>
+                </div>
+              </div>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="glass p-6 rounded-xl"
-          >
-            <p className="text-foreground/60 text-sm mb-1">Total Assessments</p>
-            <p className="text-3xl font-bold">{assessments.length}</p>
-          </motion.div>
-        </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="glass p-6 rounded-xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <span className="text-lg font-bold text-muted-foreground">{SKILL_LIST.length}</span>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-sm">Total Skills</p>
+                  <p className="text-2xl font-bold text-foreground">{SKILL_LIST.length}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </section>
 
-      {/* Assessments List */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="glass mb-8">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-            <TabsTrigger value="pending">Not Started</TabsTrigger>
-          </TabsList>
+      {/* Content */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <AnimatePresence mode="wait">
+          {selectedSkill ? (
+            <motion.div
+              key="rounds"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Skill header */}
+              <div className="glass p-6 rounded-xl mb-6">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br ${selectedSkill.color}`}
+                  >
+                    <selectedSkill.icon className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">{selectedSkill.name}</h2>
+                    <p className="text-muted-foreground">{selectedSkill.description}</p>
+                  </div>
+                </div>
+              </div>
 
-          <TabsContent value="all" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {assessments.map((assessment, index) => (
-                <AssessmentCard key={index} {...assessment} delay={index * 0.05} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="completed" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {assessments
-                .filter(a => a.status === 'completed')
-                .map((assessment, index) => (
-                  <AssessmentCard key={index} {...assessment} delay={index * 0.05} />
-                ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="in-progress" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {assessments
-                .filter(a => a.status === 'in-progress')
-                .map((assessment, index) => (
-                  <AssessmentCard key={index} {...assessment} delay={index * 0.05} />
-                ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="pending" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {assessments
-                .filter(a => a.status === 'pending')
-                .map((assessment, index) => (
-                  <AssessmentCard key={index} {...assessment} delay={index * 0.05} />
-                ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+              {/* Round stepper */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Assessment Rounds</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Complete all 3 rounds to earn your {selectedSkill.name} credential
+                </p>
+                <RoundStepper
+                  skill={selectedSkill}
+                  completedRounds={getSkillProgress(selectedSkill.id)}
+                  onStartRound={handleStartRound}
+                />
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="skills"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <h3 className="text-lg font-semibold text-foreground mb-4">Select a Skill</h3>
+              <SkillSelector
+                onSelectSkill={setSelectedSkill}
+                selectedSkillId={selectedSkill?.id}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
     </div>
   );
