@@ -1,0 +1,607 @@
+{
+  "skills": {
+    "react-advanced": {
+      "title": "React Advanced",
+      "description": "Advanced React patterns and hooks",
+      "rounds": {
+        "round1": {
+          "difficulty": "Intermediate",
+          "questions": [
+            {
+              "id": "q1",
+              "question": "What is the main purpose of the useCallback hook in React?",
+              "options": [
+                "To memoize callback functions and prevent unnecessary re-renders",
+                "To handle asynchronous operations",
+                "To manage component state",
+                "To create side effects"
+              ],
+              "correct": 0,
+              "explanation": "useCallback memoizes a callback function, returning the same function reference if dependencies haven't changed."
+            },
+            {
+              "id": "q2",
+              "question": "Which hook allows you to synchronize a component with external systems?",
+              "options": [
+                "useState",
+                "useEffect",
+                "useContext",
+                "useReducer"
+              ],
+              "correct": 1,
+              "explanation": "useEffect is used for side effects like API calls, subscriptions, and DOM manipulations."
+            },
+            {
+              "id": "q3",
+              "question": "What is the difference between controlled and uncontrolled components?",
+              "options": [
+                "Controlled components use local state, uncontrolled use refs",
+                "Controlled components have their state managed by React, uncontrolled components manage their own state",
+                "There is no difference",
+                "Uncontrolled components are deprecated"
+              ],
+              "correct": 1,
+              "explanation": "Controlled components have React state driving the form values, while uncontrolled components rely on the DOM."
+            },
+            {
+              "id": "q4",
+              "question": "How does React.memo improve performance?",
+              "options": [
+                "By caching component render results",
+                "By preventing re-renders when props haven't changed",
+                "By optimizing bundle size",
+                "By reducing memory usage"
+              ],
+              "correct": 1,
+              "explanation": "React.memo skips re-rendering a component if its props haven't changed, improving performance."
+            },
+            {
+              "id": "q5",
+              "question": "What does the dependency array in useEffect do?",
+              "options": [
+                "Controls which dependencies are imported",
+                "Specifies when the effect should run based on changed dependencies",
+                "Stores component dependencies",
+                "Defines component props"
+              ],
+              "correct": 1,
+              "explanation": "The dependency array determines when useEffect should run - empty array means once, undefined means every render."
+            }
+          ]
+        },
+        "round2": {
+          "difficulty": "Advanced",
+          "questions": [
+            {
+              "id": "q6",
+              "question": "What is the purpose of useContext hook?",
+              "options": [
+                "To create global state management",
+                "To access context values without prop drilling",
+                "To manage side effects",
+                "To handle component lifecycle"
+              ],
+              "correct": 1,
+              "explanation": "useContext allows consuming context values directly without passing props through intermediate components."
+            },
+            {
+              "id": "q7",
+              "question": "How do you optimize a list rendering in React?",
+              "options": [
+                "Use keys for each item",
+                "Use React.memo on list items and proper key usage",
+                "Convert to a class component",
+                "Use inline functions"
+              ],
+              "correct": 1,
+              "explanation": "Combining React.memo with proper unique keys ensures minimal re-renders of list items."
+            },
+            {
+              "id": "q8",
+              "question": "What is the difference between useMemo and useCallback?",
+              "options": [
+                "useMemo memoizes values, useCallback memoizes functions",
+                "They are identical",
+                "useCallback is for async operations",
+                "useMemo is deprecated"
+              ],
+              "correct": 0,
+              "explanation": "useMemo memoizes expensive computations, useCallback memoizes function references."
+            },
+            {
+              "id": "q9",
+              "question": "How can you prevent infinite loops in useEffect?",
+              "options": [
+                "By not using dependencies",
+                "By properly specifying the dependency array",
+                "By using return statements",
+                "By converting to a class component"
+              ],
+              "correct": 1,
+              "explanation": "Properly defining the dependency array ensures useEffect only runs when necessary dependencies change."
+            },
+            {
+              "id": "q10",
+              "question": "What is a custom hook in React?",
+              "options": [
+                "A hook provided by React",
+                "A reusable function that uses hooks to share logic across components",
+                "A CSS hook",
+                "A lifecycle method"
+              ],
+              "correct": 1,
+              "explanation": "Custom hooks are JavaScript functions that use React hooks to extract and share stateful logic."
+            }
+          ]
+        },
+        "round3": {
+          "difficulty": "Expert",
+          "questions": [
+            {
+              "id": "q11",
+              "question": "What is concurrent rendering in React 18?",
+              "options": [
+                "Rendering multiple components at once",
+                "Rendering is interruptible, allowing React to pause work",
+                "Synchronous rendering",
+                "Rendering on multiple threads"
+              ],
+              "correct": 1,
+              "explanation": "Concurrent rendering allows React to pause work to handle higher-priority updates like user input."
+            },
+            {
+              "id": "q12",
+              "question": "What is the purpose of useTransition hook?",
+              "options": [
+                "To manage animations",
+                "To mark state updates as non-urgent and track transition state",
+                "To handle component transitions",
+                "To manage route transitions"
+              ],
+              "correct": 1,
+              "explanation": "useTransition marks state updates as non-urgent, allowing React to interrupt them for higher-priority updates."
+            },
+            {
+              "id": "q13",
+              "question": "How does Suspense work with code splitting?",
+              "options": [
+                "It pauses rendering during code splitting",
+                "It shows a fallback while lazy-loaded components load",
+                "It prevents code splitting",
+                "It combines code chunks"
+              ],
+              "correct": 1,
+              "explanation": "Suspense displays a fallback UI while lazy-loaded components are being fetched and loaded."
+            },
+            {
+              "id": "q14",
+              "question": "What are Fiber nodes in React's reconciliation?",
+              "options": [
+                "CSS fibers",
+                "Units of work representing components in React's internal architecture",
+                "Network fibers",
+                "Asynchronous fibers"
+              ],
+              "correct": 1,
+              "explanation": "Fiber nodes are React's internal data structure enabling incremental rendering and priority-based updates."
+            },
+            {
+              "id": "q15",
+              "question": "What is the difference between error boundaries and try-catch?",
+              "options": [
+                "Error boundaries catch all errors",
+                "Error boundaries catch rendering errors, try-catch catches thrown errors",
+                "Try-catch is better for React",
+                "They are the same"
+              ],
+              "correct": 1,
+              "explanation": "Error boundaries catch errors during rendering and lifecycle, while try-catch handles synchronous errors."
+            }
+          ]
+        }
+      }
+    },
+    "javascript-mastery": {
+      "title": "JavaScript Mastery",
+      "description": "Advanced JavaScript concepts",
+      "rounds": {
+        "round1": {
+          "difficulty": "Intermediate",
+          "questions": [
+            {
+              "id": "q1",
+              "question": "What is a closure in JavaScript?",
+              "options": [
+                "A function that is closed",
+                "A function that has access to variables from its outer scope",
+                "A class definition",
+                "A type of loop"
+              ],
+              "correct": 1,
+              "explanation": "A closure is a function that retains access to variables from its enclosing scope."
+            },
+            {
+              "id": "q2",
+              "question": "What is the difference between let and var?",
+              "options": [
+                "There is no difference",
+                "let is function-scoped, var is block-scoped",
+                "let is block-scoped, var is function-scoped",
+                "let is deprecated"
+              ],
+              "correct": 2,
+              "explanation": "let is block-scoped while var is function-scoped, making let safer for modern JavaScript."
+            },
+            {
+              "id": "q3",
+              "question": "What does the this keyword refer to in JavaScript?",
+              "options": [
+                "Always the window object",
+                "The object that called the function",
+                "The global object",
+                "Always undefined"
+              ],
+              "correct": 1,
+              "explanation": "this refers to the object that invoked the function, though it can be changed with call, apply, or bind."
+            },
+            {
+              "id": "q4",
+              "question": "What is hoisting in JavaScript?",
+              "options": [
+                "Lifting elements in the DOM",
+                "Moving variable and function declarations to the top of their scope",
+                "Importing functions",
+                "A type of optimization"
+              ],
+              "correct": 1,
+              "explanation": "Hoisting moves declarations to the top, but initializations remain in place."
+            },
+            {
+              "id": "q5",
+              "question": "What is a promise in JavaScript?",
+              "options": [
+                "A function that will run later",
+                "An object representing eventual completion of an async operation",
+                "A type of loop",
+                "A callback function"
+              ],
+              "correct": 1,
+              "explanation": "A promise is an object that represents the eventual result of an async operation."
+            }
+          ]
+        },
+        "round2": {
+          "difficulty": "Advanced",
+          "questions": [
+            {
+              "id": "q6",
+              "question": "What is the event loop in JavaScript?",
+              "options": [
+                "A loop that handles events",
+                "The mechanism that executes code, collects events, and executes queued sub-tasks",
+                "A CSS loop",
+                "An animation loop"
+              ],
+              "correct": 1,
+              "explanation": "The event loop continuously checks the call stack and callback queue to execute tasks."
+            },
+            {
+              "id": "q7",
+              "question": "What is async/await?",
+              "options": [
+                "A type of loop",
+                "Syntactic sugar for promises making async code look synchronous",
+                "A CSS property",
+                "A DOM API"
+              ],
+              "correct": 1,
+              "explanation": "async/await is a cleaner way to work with promises, making asynchronous code look and behave more like synchronous code."
+            },
+            {
+              "id": "q8",
+              "question": "What is destructuring in JavaScript?",
+              "options": [
+                "Destroying objects",
+                "Extracting values from arrays or objects into separate variables",
+                "Creating objects",
+                "A performance technique"
+              ],
+              "correct": 1,
+              "explanation": "Destructuring allows unpacking values from arrays/objects into variables in a concise syntax."
+            },
+            {
+              "id": "q9",
+              "question": "What is the spread operator used for?",
+              "options": [
+                "To spread elements across the screen",
+                "To expand arrays or objects",
+                "To create loops",
+                "To handle events"
+              ],
+              "correct": 1,
+              "explanation": "The spread operator expands iterables into individual elements."
+            },
+            {
+              "id": "q10",
+              "question": "What is a higher-order function?",
+              "options": [
+                "A function with a higher priority",
+                "A function that takes or returns another function",
+                "A complex function",
+                "A function with many parameters"
+              ],
+              "correct": 1,
+              "explanation": "A higher-order function is one that accepts functions as arguments or returns a function."
+            }
+          ]
+        },
+        "round3": {
+          "difficulty": "Expert",
+          "questions": [
+            {
+              "id": "q11",
+              "question": "What is the difference between Object.create and constructor functions?",
+              "options": [
+                "They are the same",
+                "Object.create sets prototype, constructors use new",
+                "Constructors are deprecated",
+                "Object.create is async"
+              ],
+              "correct": 1,
+              "explanation": "Object.create explicitly sets the prototype, while constructor functions use the new keyword."
+            },
+            {
+              "id": "q12",
+              "question": "What is the purpose of Object.defineProperty?",
+              "options": [
+                "To create properties",
+                "To define property descriptors with control over get/set/enumerable/configurable",
+                "To delete properties",
+                "To copy properties"
+              ],
+              "correct": 1,
+              "explanation": "Object.defineProperty allows defining properties with detailed control over their behavior."
+            },
+            {
+              "id": "q13",
+              "question": "What is a Proxy object in JavaScript?",
+              "options": [
+                "A backup object",
+                "An object that intercepts operations on another object",
+                "A type of API",
+                "A network proxy"
+              ],
+              "correct": 1,
+              "explanation": "A Proxy is a special object that allows intercepting and customizing operations on target objects."
+            },
+            {
+              "id": "q14",
+              "question": "What is a WeakMap in JavaScript?",
+              "options": [
+                "A map that is weak",
+                "A map with only weak references as keys, not enumerable",
+                "A deprecated data structure",
+                "An async map"
+              ],
+              "correct": 1,
+              "explanation": "WeakMap holds only weak references, allowing garbage collection of unused keys."
+            },
+            {
+              "id": "q15",
+              "question": "What is the Symbol primitive type used for?",
+              "options": [
+                "Mathematical symbols",
+                "Creating unique identifiers and hidden object properties",
+                "String symbols",
+                "CSS symbols"
+              ],
+              "correct": 1,
+              "explanation": "Symbols are unique, immutable identifiers useful for creating private object properties."
+            }
+          ]
+        }
+      }
+    },
+    "typescript-pro": {
+      "title": "TypeScript Pro",
+      "description": "Advanced TypeScript patterns",
+      "rounds": {
+        "round1": {
+          "difficulty": "Intermediate",
+          "questions": [
+            {
+              "id": "q1",
+              "question": "What is the difference between interface and type alias?",
+              "options": [
+                "There is no difference",
+                "Interfaces use class syntax, types don't",
+                "Interfaces can be merged, types cannot",
+                "Types are deprecated"
+              ],
+              "correct": 2,
+              "explanation": "Interfaces can be merged/extended while type aliases cannot, though both define object shapes."
+            },
+            {
+              "id": "q2",
+              "question": "What are generics in TypeScript?",
+              "options": [
+                "Generic functions",
+                "Type parameters that allow reusing code for multiple types",
+                "A type of loop",
+                "A deprecated feature"
+              ],
+              "correct": 1,
+              "explanation": "Generics allow functions/classes to work with any type while maintaining type safety."
+            },
+            {
+              "id": "q3",
+              "question": "What is a utility type in TypeScript?",
+              "options": [
+                "A type for utilities",
+                "Built-in types that transform other types",
+                "A function type",
+                "A class type"
+              ],
+              "correct": 1,
+              "explanation": "Utility types like Partial, Record, Pick modify existing types to create new ones."
+            },
+            {
+              "id": "q4",
+              "question": "What does the keyof keyword do?",
+              "options": [
+                "Gets the keys of an object at runtime",
+                "Gets the union of all keys in a type",
+                "Creates a new key",
+                "Removes a key"
+              ],
+              "correct": 1,
+              "explanation": "keyof returns a union type of all property keys in an object type."
+            },
+            {
+              "id": "q5",
+              "question": "What is type inference in TypeScript?",
+              "options": [
+                "Inferring types from external sources",
+                "TypeScript automatically determining types from values",
+                "Manual type assignment",
+                "A debugging tool"
+              ],
+              "correct": 1,
+              "explanation": "Type inference allows TypeScript to determine types from context without explicit annotations."
+            }
+          ]
+        },
+        "round2": {
+          "difficulty": "Advanced",
+          "questions": [
+            {
+              "id": "q6",
+              "question": "What are conditional types in TypeScript?",
+              "options": [
+                "Type checking at runtime",
+                "Types that depend on a condition using ternary syntax",
+                "A type of loop",
+                "Deprecated feature"
+              ],
+              "correct": 1,
+              "explanation": "Conditional types use the ternary operator to choose between types based on a condition."
+            },
+            {
+              "id": "q7",
+              "question": "What is a mapped type?",
+              "options": [
+                "A type that maps to another type",
+                "A type that transforms properties of another type",
+                "A type for maps",
+                "A deprecated pattern"
+              ],
+              "correct": 1,
+              "explanation": "Mapped types iterate over properties of a type to create new types."
+            },
+            {
+              "id": "q8",
+              "question": "What does the infer keyword do?",
+              "options": [
+                "Infers types at runtime",
+                "Captures types in conditional types for later use",
+                "Creates inference rules",
+                "A variable declaration"
+              ],
+              "correct": 1,
+              "explanation": "infer captures a type within a conditional type for use in the true branch."
+            },
+            {
+              "id": "q9",
+              "question": "What is a type guard?",
+              "options": [
+                "A guard for types",
+                "A function/expression that narrows types",
+                "A security feature",
+                "A warning system"
+              ],
+              "correct": 1,
+              "explanation": "Type guards narrow union types through checks like typeof, instanceof, or custom predicates."
+            },
+            {
+              "id": "q10",
+              "question": "What is the unknown type?",
+              "options": [
+                "A variable with no type",
+                "A top type requiring type checking before use",
+                "An error type",
+                "A deprecated type"
+              ],
+              "correct": 1,
+              "explanation": "unknown is the safe alternative to any, requiring type narrowing before operations."
+            }
+          ]
+        },
+        "round3": {
+          "difficulty": "Expert",
+          "questions": [
+            {
+              "id": "q11",
+              "question": "What are variance and contravariance?",
+              "options": [
+                "Mathematical concepts",
+                "How types relate to subtypes in assignments",
+                "A variance in TypeScript",
+                "Performance optimization"
+              ],
+              "correct": 1,
+              "explanation": "Variance describes whether a type constructor preserves, reverses, or ignores subtype relationships."
+            },
+            {
+              "id": "q12",
+              "question": "What is the purpose of const type parameters?",
+              "options": [
+                "To create constants",
+                "To preserve literal types without widening",
+                "To define constant functions",
+                "A deprecated feature"
+              ],
+              "correct": 1,
+              "explanation": "const type parameters prevent literal type widening, preserving exact types."
+            },
+            {
+              "id": "q13",
+              "question": "What is a recursive type?",
+              "options": [
+                "A type that loops",
+                "A type that references itself in its definition",
+                "A type of recursion",
+                "A deprecated pattern"
+              ],
+              "correct": 1,
+              "explanation": "Recursive types reference themselves, useful for deep structures like nested arrays."
+            },
+            {
+              "id": "q14",
+              "question": "What is a distributive conditional type?",
+              "options": [
+                "A distributed type",
+                "A conditional type that distributes over unions",
+                "A type of union",
+                "A performance optimization"
+              ],
+              "correct": 1,
+              "explanation": "Distributive conditionals apply to each union member separately."
+            },
+            {
+              "id": "q15",
+              "question": "What is the purpose of template literal types?",
+              "options": [
+                "For template strings",
+                "To create new literal types from existing ones",
+                "For HTML templates",
+                "A string feature"
+              ],
+              "correct": 1,
+              "explanation": "Template literal types combine literal types using template syntax to create new literal strings."
+            }
+          ]
+        }
+      }
+    }
+  }
+}
