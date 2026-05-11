@@ -43,13 +43,13 @@ export default function SignUpPage() {
     setIsSubmitting(true);
     try {
       await signUpWithEmail(email, password, name);
-      toast.success('Account created successfully!');
-      router.push('/');
+      toast.success('Account created! Please check your email to confirm.');
+      router.push('/login');
     } catch (error: unknown) {
-      const firebaseError = error as { code?: string };
-      if (firebaseError.code === 'auth/email-already-in-use') {
+      const supabaseError = error as { message?: string };
+      if (supabaseError.message?.includes('already registered')) {
         toast.error('An account with this email already exists');
-      } else if (firebaseError.code === 'auth/weak-password') {
+      } else if (supabaseError.message?.includes('Password')) {
         toast.error('Password is too weak');
       } else {
         toast.error('Failed to create account. Please try again.');

@@ -1,21 +1,24 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { User as FirebaseUser } from 'firebase/auth';
-import {
-  type AppUser,
-  type UserRole,
-  subscribeToAuthState,
-  getUserDocument,
-  signInWithGoogle as authSignInWithGoogle,
-  signInWithEmail as authSignInWithEmail,
-  signUpWithEmail as authSignUpWithEmail,
-  signOut as authSignOut,
-} from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+
+export type UserRole = 'user' | 'admin' | 'guest';
+
+export interface AppUser {
+  id: string;
+  email: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: UserRole;
+  createdAt: Date;
+  skillsProgress: Record<string, { roundsCompleted: number[] }>;
+}
 
 interface AuthContextType {
   user: AppUser | null;
-  firebaseUser: FirebaseUser | null;
+  supabaseUser: SupabaseUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -26,95 +29,209 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   enterGuestMode: () => void;
   exitGuestMode: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = subscribeToAuthState(async (fbUser) => {
-      setFirebaseUser(fbUser);
+  const supabase = createClient();
 
-      if (fbUser) {
-        try {
-          const appUser = await getUserDocument(fbUser.uid);
-          setUser(appUser);
-          setIsGuest(false);
-        } catch (error) {
-          console.error('Error fetching user document:', error);
-          setUser(null);
-        }
-      } else {
-        setUser(null);
+  const fetchUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<AppUser | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        // User might not exist in public.users yet (trigger might be pending)
+        // Return a basic user object
+        return {
+          id: supabaseUser.id,
+          email: supabaseUser.email ?? null,
+          displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email?.split('@')[0] ?? null,
+          avatarUrl: supabaseUser.user_metadata?.avatar_url ?? null,
+          role: 'user',
+          createdAt: new Date(supabaseUser.created_at),
+          skillsProgress: {},
+        };
       }
 
-      setIsLoading(false);
-    });
+      return {
+        id: data.id,
+        email: data.email,
+        displayName: data.display_name,
+        avatarUrl: data.avatar_url,
+        role: data.role as UserRole,
+        createdAt: new Date(data.created_at),
+        skillsProgress: data.skills_progress ?? {},
+      };
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
+    }
+  }, [supabase]);
 
-    return () => unsubscribe();
-  }, []);
+  const refreshUser = useCallback(async () => {
+    if (supabaseUser) {
+      const appUser = await fetchUserProfile(supabaseUser);
+      setUser(appUser);
+    }
+  }, [supabaseUser, fetchUserProfile]);
+
+  useEffect(() => {
+    // Get initial session
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          const appUser = await fetchUserProfile(session.user);
+          setUser(appUser);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setSupabaseUser(session.user);
+          const appUser = await fetchUserProfile(session.user);
+          setUser(appUser);
+          setIsGuest(false);
+        } else {
+          setSupabaseUser(null);
+          setUser(null);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase, fetchUserProfile]);
 
   const signInWithGoogle = useCallback(async () => {
     setIsLoading(true);
     try {
-      const appUser = await authSignInWithGoogle();
-      setUser(appUser);
-      setIsGuest(false);
-    } finally {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
+            `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Google sign in error:', error);
       setIsLoading(false);
+      throw error;
     }
-  }, []);
+  }, [supabase]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const appUser = await authSignInWithEmail(email, password);
-      setUser(appUser);
-      setIsGuest(false);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      
+      if (data.user) {
+        setSupabaseUser(data.user);
+        const appUser = await fetchUserProfile(data.user);
+        setUser(appUser);
+        setIsGuest(false);
+      }
+    } catch (error) {
+      console.error('Email sign in error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [supabase, fetchUserProfile]);
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, displayName: string) => {
       setIsLoading(true);
       try {
-        const appUser = await authSignUpWithEmail(email, password, displayName);
-        setUser(appUser);
-        setIsGuest(false);
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
+              `${window.location.origin}/auth/callback`,
+            data: {
+              display_name: displayName,
+            },
+          },
+        });
+        if (error) throw error;
+        
+        // User needs to confirm email before they can sign in
+        // The trigger will create the user profile
+        if (data.user) {
+          setSupabaseUser(data.user);
+          // For users who don't need email confirmation:
+          if (data.session) {
+            const appUser = await fetchUserProfile(data.user);
+            setUser(appUser);
+            setIsGuest(false);
+          }
+        }
+      } catch (error) {
+        console.error('Email sign up error:', error);
+        throw error;
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [supabase, fetchUserProfile]
   );
 
   const signOut = useCallback(async () => {
     setIsLoading(true);
     try {
-      await authSignOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
       setUser(null);
+      setSupabaseUser(null);
       setIsGuest(false);
+    } catch (error) {
+      console.error('Sign out error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   const enterGuestMode = useCallback(() => {
     setUser({
-      uid: 'guest',
+      id: 'guest',
       email: null,
       displayName: 'Guest User',
-      photoURL: null,
+      avatarUrl: null,
       role: 'guest' as UserRole,
       createdAt: new Date(),
-      skills: {},
+      skillsProgress: {},
     });
     setIsGuest(true);
   }, []);
@@ -126,7 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextType = {
     user,
-    firebaseUser,
+    supabaseUser,
     isLoading,
     isAuthenticated: !!user && !isGuest,
     isAdmin: user?.role === 'admin',
@@ -137,6 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     enterGuestMode,
     exitGuestMode,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

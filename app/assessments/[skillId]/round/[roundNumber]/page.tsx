@@ -13,10 +13,8 @@ import { getSkillById, type Skill, type RoundConfig } from '@/lib/skills';
 import { getSkillQuestionsForRound, getCodingProblemsForSkill, type CodingProblem } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { doc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { createClient } from '@/lib/supabase/client';
 import { storeCredentialHash } from '@/lib/blockchain';
-import { createCredential } from '@/lib/firebase-helpers';
 import type { Question } from '@/lib/store';
 
 type RoundNumber = 1 | 2 | 3;
@@ -134,7 +132,7 @@ export default function RoundPage() {
       // Clear saved state
       localStorage.removeItem(`quiz-${skillId}-${roundNumber}`);
 
-      if (passed && user && db) {
+      if (passed && user) {
         toast.success(`Round ${roundNumber} completed! Score: ${percentage.toFixed(0)}%`);
         await saveRoundProgressAndCheckCredential(passedCount, percentage);
       } else if (!passed) {
@@ -155,7 +153,7 @@ export default function RoundPage() {
 
       setShowResults(true);
 
-      if (passed && user && db) {
+      if (passed && user) {
         toast.success(`Round ${roundNumber} completed! Score: ${percentage.toFixed(0)}%`);
         await saveRoundProgressAndCheckCredential(correctCount, percentage);
       } else if (!passed) {
@@ -165,17 +163,41 @@ export default function RoundPage() {
   };
 
   const saveRoundProgressAndCheckCredential = async (score: number, percentage: number) => {
-    if (!user || !db || !skill) return;
+    if (!user || !skill || user.id === 'guest') return;
+
+    const supabase = createClient();
 
     try {
-      const userRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userRef);
-      
-      if (!userDoc.exists()) return;
+      // First, record the attempt
+      const { error: attemptError } = await supabase
+        .from('attempts')
+        .insert({
+          user_id: user.id,
+          skill_id: skillId,
+          round_number: roundNumber,
+          score: Math.round(percentage),
+          passed: true,
+          answers: roundConfig?.type === 'coding' ? null : { answers },
+        });
 
-      const userData = userDoc.data();
-      const skills = userData.skills || {};
-      const skillProgress = skills[skillId] || { roundsCompleted: [] };
+      if (attemptError) {
+        console.error('Error recording attempt:', attemptError);
+      }
+
+      // Get current skills_progress from users table
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('skills_progress')
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching user:', fetchError);
+        return;
+      }
+
+      const skillsProgress = userData?.skills_progress || {};
+      const skillProgress = skillsProgress[skillId] || { roundsCompleted: [] };
       const roundsCompleted = skillProgress.roundsCompleted || [];
 
       // Add this round if not already completed
@@ -184,10 +206,21 @@ export default function RoundPage() {
         roundsCompleted.sort((a: number, b: number) => a - b);
       }
 
-      // Update user skills in Firestore
-      await updateDoc(userRef, {
-        [`skills.${skillId}`]: { roundsCompleted },
-      });
+      // Update user skills_progress
+      const updatedSkillsProgress = {
+        ...skillsProgress,
+        [skillId]: { roundsCompleted },
+      };
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ skills_progress: updatedSkillsProgress })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Error updating skills:', updateError);
+        return;
+      }
 
       // Store round score for credential
       const newRoundScores = [...roundScores, { round: roundNumber, score, percentage }];
@@ -197,36 +230,40 @@ export default function RoundPage() {
       if (roundsCompleted.length === 3) {
         toast.loading('Generating your credential...');
 
-        // Generate credential
-        const credentialId = `cred-${user.uid}-${skillId}-${Date.now()}`;
-        const avgScore = newRoundScores.reduce((acc, r) => acc + r.percentage, 0) / 3;
+        // Calculate average score from all rounds
+        const avgScore = Math.round(newRoundScores.reduce((acc, r) => acc + r.percentage, 0) / 3);
 
-        // Store on blockchain
+        // Store on blockchain (mock)
         const blockchainResult = await storeCredentialHash({
-          credentialId,
-          recipientId: user.uid,
+          credentialId: `cred-${user.id}-${skillId}-${Date.now()}`,
+          recipientId: user.id,
           skillId,
           skillName: skill.name,
           score: avgScore,
           rounds: newRoundScores,
         });
 
-        // Create credential in Firestore
-        const expiresAt = new Date();
-        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        // Create credential in Supabase
+        const verificationUrl = `${window.location.origin}/verify/${blockchainResult.blockchainHash}`;
 
-        await createCredential({
-          userId: user.uid,
-          skillId,
-          skillTitle: skill.name,
-          blockchainHash: blockchainResult.blockchainHash,
-          rounds: newRoundScores,
-          issuedAt: Timestamp.now(),
-          expiresAt: Timestamp.fromDate(expiresAt),
-          isVerified: true,
-          views: 0,
-          shareCount: 0,
-        });
+        const { error: credError } = await supabase
+          .from('credentials')
+          .insert({
+            user_id: user.id,
+            skill_id: skillId,
+            final_score: avgScore,
+            hash: blockchainResult.blockchainHash,
+            verification_url: verificationUrl,
+            round_scores: newRoundScores.map(r => Math.round(r.percentage)),
+            views: 0,
+          });
+
+        if (credError) {
+          console.error('Error creating credential:', credError);
+          toast.dismiss();
+          toast.error('Failed to create credential');
+          return;
+        }
 
         toast.dismiss();
         toast.success('Credential issued successfully!');

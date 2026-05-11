@@ -4,10 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Users, Award, BookOpen, Shield, Search, Filter, CheckCircle, Eye } from 'lucide-react';
-import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/providers/AuthProvider';
-import type { AppUser } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth, type AppUser } from '@/providers/AuthProvider';
 import { SKILL_LIST, getAllRoundsCompleted, type SkillId } from '@/lib/skills';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +63,8 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
 
+  const supabase = createClient();
+
   useEffect(() => {
     if (!isLoading && !isAdmin) {
       toast.error('Access denied. Admin privileges required.');
@@ -74,64 +74,61 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function fetchUsers() {
-      if (!db || !isAdmin) return;
+      if (!isAdmin) return;
 
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, orderBy('createdAt', 'desc'), limit(100));
-        const snapshot = await getDocs(q);
+        // Fetch users with their credentials count
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select(`
+            *,
+            credentials(id)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(100);
 
-        // Fetch credentials count for each user
-        const usersData: UserWithSkills[] = await Promise.all(
-          snapshot.docs.map(async (doc) => {
-            const data = doc.data();
-            const skills = data.skills || {};
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
+          toast.error('Failed to load users');
+          return;
+        }
 
-            let completedSkillsCount = 0;
-            let inProgressSkillsCount = 0;
-            let totalRoundsCompleted = 0;
+        const formattedUsers: UserWithSkills[] = (usersData || []).map((userData) => {
+          const skillsProgress = userData.skills_progress || {};
 
-            Object.entries(skills).forEach(([, progress]: [string, unknown]) => {
-              const skillProgress = progress as { roundsCompleted?: number[] };
-              const completedRounds = skillProgress?.roundsCompleted || [];
-              totalRoundsCompleted += completedRounds.length;
+          let completedSkillsCount = 0;
+          let inProgressSkillsCount = 0;
+          let totalRoundsCompleted = 0;
 
-              if (getAllRoundsCompleted(completedRounds)) {
-                completedSkillsCount++;
-              } else if (completedRounds.length > 0) {
-                inProgressSkillsCount++;
-              }
-            });
+          Object.entries(skillsProgress).forEach(([, progress]: [string, unknown]) => {
+            const skillProgress = progress as { roundsCompleted?: number[] };
+            const completedRounds = skillProgress?.roundsCompleted || [];
+            totalRoundsCompleted += completedRounds.length;
 
-            // Get credentials count
-            const credentialsRef = collection(db, 'credentials');
-            const credQuery = query(
-              credentialsRef,
-              where('userId', '==', doc.id)
-            );
-            const credSnapshot = await getDocs(credQuery);
-            const credentialsCount = credSnapshot.docs.filter(
-              (d) => !d.data().isRevoked
-            ).length;
+            if (getAllRoundsCompleted(completedRounds)) {
+              completedSkillsCount++;
+            } else if (completedRounds.length > 0) {
+              inProgressSkillsCount++;
+            }
+          });
 
-            return {
-              uid: doc.id,
-              email: data.email,
-              displayName: data.displayName,
-              photoURL: data.photoURL,
-              role: data.role || 'user',
-              createdAt: data.createdAt?.toDate() || new Date(),
-              skills,
-              completedSkillsCount,
-              inProgressSkillsCount,
-              totalRoundsCompleted,
-              credentialsCount,
-            };
-          })
-        );
+          return {
+            id: userData.id,
+            email: userData.email,
+            displayName: userData.display_name,
+            avatarUrl: userData.avatar_url,
+            role: userData.role || 'user',
+            createdAt: new Date(userData.created_at),
+            skillsProgress,
+            completedSkillsCount,
+            inProgressSkillsCount,
+            totalRoundsCompleted,
+            credentialsCount: userData.credentials?.length || 0,
+          };
+        });
 
-        setUsers(usersData);
-        setFilteredUsers(usersData);
+        setUsers(formattedUsers);
+        setFilteredUsers(formattedUsers);
       } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to load users');
@@ -141,7 +138,7 @@ export default function AdminPage() {
     }
 
     fetchUsers();
-  }, [isAdmin]);
+  }, [isAdmin, supabase]);
 
   useEffect(() => {
     let filtered = users;
@@ -157,7 +154,7 @@ export default function AdminPage() {
 
     if (skillFilter !== 'all') {
       filtered = filtered.filter((u) => {
-        const skillProgress = u.skills?.[skillFilter as SkillId];
+        const skillProgress = u.skillsProgress?.[skillFilter as SkillId];
         return skillProgress && (skillProgress as { roundsCompleted?: number[] }).roundsCompleted?.length > 0;
       });
     }
@@ -171,24 +168,32 @@ export default function AdminPage() {
     setIsLoadingCredentials(true);
 
     try {
-      if (!db) return;
+      const { data: credentialsData, error } = await supabase
+        .from('credentials')
+        .select('*')
+        .eq('user_id', userData.id);
 
-      const credentialsRef = collection(db, 'credentials');
-      const credQuery = query(credentialsRef, where('userId', '==', userData.uid));
-      const credSnapshot = await getDocs(credQuery);
+      if (error) {
+        console.error('Error fetching credentials:', error);
+        toast.error('Failed to load user credentials');
+        return;
+      }
 
-      const credentials: CredentialData[] = credSnapshot.docs.map((doc) => {
-        const data = doc.data();
+      const credentials: CredentialData[] = (credentialsData || []).map((cred) => {
+        const skillInfo = SKILL_LIST.find(s => s.id === cred.skill_id);
         return {
-          id: doc.id,
-          skillId: data.skillId,
-          skillTitle: data.skillTitle,
-          blockchainHash: data.blockchainHash,
-          rounds: data.rounds,
-          issuedAt: data.issuedAt?.toDate() || new Date(),
-          expiresAt: data.expiresAt?.toDate(),
-          isVerified: data.isVerified ?? true,
-          isRevoked: data.isRevoked ?? false,
+          id: cred.id,
+          skillId: cred.skill_id,
+          skillTitle: skillInfo?.name || cred.skill_id,
+          blockchainHash: cred.hash,
+          rounds: cred.round_scores?.map((score: number, idx: number) => ({
+            round: idx + 1,
+            score,
+            percentage: score,
+          })),
+          issuedAt: new Date(cred.issued_at),
+          isVerified: true,
+          isRevoked: false,
         };
       });
 
@@ -205,23 +210,39 @@ export default function AdminPage() {
     if (!user) return;
 
     try {
-      const response = await fetch('/api/admin/reset-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, skillId, adminUserId: user.uid }),
-      });
+      // Get current user's skills_progress
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('skills_progress')
+        .eq('id', userId)
+        .single();
 
-      const data = await response.json();
+      if (fetchError) throw fetchError;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to reset progress');
-      }
+      const skillsProgress = userData?.skills_progress || {};
+      delete skillsProgress[skillId];
+
+      // Update the user's skills_progress
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ skills_progress: skillsProgress })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Delete any credentials for this skill
+      await supabase
+        .from('credentials')
+        .delete()
+        .eq('user_id', userId)
+        .eq('skill_id', skillId);
 
       // Update local state
       setUsers((prev) =>
         prev.map((u) => {
-          if (u.uid === userId) {
-            const newSkills = { ...u.skills, [skillId]: { roundsCompleted: [] } };
+          if (u.id === userId) {
+            const newSkills = { ...u.skillsProgress };
+            delete newSkills[skillId];
             const completedSkillsCount = Object.values(newSkills).filter(
               (s: unknown) => getAllRoundsCompleted((s as { roundsCompleted?: number[] })?.roundsCompleted || [])
             ).length;
@@ -236,7 +257,7 @@ export default function AdminPage() {
 
             return {
               ...u,
-              skills: newSkills,
+              skillsProgress: newSkills,
               completedSkillsCount,
               inProgressSkillsCount,
               totalRoundsCompleted,
@@ -248,24 +269,26 @@ export default function AdminPage() {
       );
 
       // Update selected user if viewing
-      if (selectedUser?.uid === userId) {
+      if (selectedUser?.id === userId) {
+        const newSkills = { ...selectedUser.skillsProgress };
+        delete newSkills[skillId];
         setSelectedUser((prev) =>
           prev
             ? {
                 ...prev,
-                skills: { ...prev.skills, [skillId]: { roundsCompleted: [] } },
+                skillsProgress: newSkills,
               }
             : null
         );
         setSelectedUserCredentials((prev) =>
-          prev.map((c) => (c.skillId === skillId ? { ...c, isRevoked: true } : c))
+          prev.filter((c) => c.skillId !== skillId)
         );
       }
 
-      toast.success(data.message);
+      toast.success('Skill progress reset successfully');
     } catch (error) {
       console.error('Error resetting skill:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to reset skill progress');
+      toast.error('Failed to reset skill progress');
     }
   };
 
@@ -279,34 +302,58 @@ export default function AdminPage() {
     if (!user) return;
 
     try {
-      const response = await fetch('/api/admin/issue-credential', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          skillId,
-          skillName,
-          finalScore,
-          roundScores,
-          adminUserId: user.uid,
-        }),
-      });
+      // Generate a mock blockchain hash
+      const hash = `0x${Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16)
+      ).join('')}`;
 
-      const data = await response.json();
+      const verificationUrl = `${window.location.origin}/verify/${hash}`;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to issue credential');
-      }
+      // Insert credential
+      const { data: credData, error: credError } = await supabase
+        .from('credentials')
+        .insert({
+          user_id: userId,
+          skill_id: skillId,
+          final_score: finalScore,
+          hash,
+          verification_url: verificationUrl,
+          round_scores: roundScores.map(r => r.percentage),
+          views: 0,
+        })
+        .select()
+        .single();
+
+      if (credError) throw credError;
+
+      // Update user's skills_progress
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('skills_progress')
+        .eq('id', userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const skillsProgress = userData?.skills_progress || {};
+      skillsProgress[skillId] = { roundsCompleted: [1, 2, 3] };
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ skills_progress: skillsProgress })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
 
       // Update local state
       setUsers((prev) =>
         prev.map((u) => {
-          if (u.uid === userId) {
+          if (u.id === userId) {
             return {
               ...u,
-              skills: {
-                ...u.skills,
-                [skillId]: { roundsCompleted: [1, 2, 3], finalScore },
+              skillsProgress: {
+                ...u.skillsProgress,
+                [skillId]: { roundsCompleted: [1, 2, 3] },
               },
               completedSkillsCount: u.completedSkillsCount + 1,
               credentialsCount: u.credentialsCount + 1,
@@ -317,14 +364,14 @@ export default function AdminPage() {
       );
 
       // Update selected user if viewing
-      if (selectedUser?.uid === userId) {
+      if (selectedUser?.id === userId) {
         setSelectedUser((prev) =>
           prev
             ? {
                 ...prev,
-                skills: {
-                  ...prev.skills,
-                  [skillId]: { roundsCompleted: [1, 2, 3], finalScore },
+                skillsProgress: {
+                  ...prev.skillsProgress,
+                  [skillId]: { roundsCompleted: [1, 2, 3] },
                 },
                 completedSkillsCount: prev.completedSkillsCount + 1,
                 credentialsCount: prev.credentialsCount + 1,
@@ -334,10 +381,10 @@ export default function AdminPage() {
         setSelectedUserCredentials((prev) => [
           ...prev,
           {
-            id: data.credentialId,
+            id: credData.id,
             skillId,
             skillTitle: skillName,
-            blockchainHash: data.blockchainHash,
+            blockchainHash: hash,
             rounds: roundScores,
             issuedAt: new Date(),
             isVerified: true,
@@ -346,10 +393,10 @@ export default function AdminPage() {
         ]);
       }
 
-      toast.success(data.message);
+      toast.success('Credential issued successfully');
     } catch (error) {
       console.error('Error issuing credential:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to issue credential');
+      toast.error('Failed to issue credential');
     }
   };
 
@@ -357,26 +404,23 @@ export default function AdminPage() {
     if (!user) return;
 
     try {
-      const response = await fetch('/api/admin/delete-user', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, adminUserId: user.uid }),
-      });
+      // Delete user from Supabase (cascades to credentials and attempts)
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete user');
-      }
+      if (error) throw error;
 
       // Remove from local state
-      setUsers((prev) => prev.filter((u) => u.uid !== userId));
-      setFilteredUsers((prev) => prev.filter((u) => u.uid !== userId));
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setFilteredUsers((prev) => prev.filter((u) => u.id !== userId));
+      setIsModalOpen(false);
 
-      toast.success(data.message);
+      toast.success('User deleted successfully');
     } catch (error) {
       console.error('Error deleting user:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete user');
+      toast.error('Failed to delete user');
     }
   };
 
@@ -581,21 +625,21 @@ export default function AdminPage() {
                   <TableBody>
                     {filteredUsers.map((u) => (
                       <TableRow
-                        key={u.uid}
+                        key={u.id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleViewUser(u)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9">
-                              <AvatarImage src={u.photoURL || undefined} alt={u.displayName || 'User'} />
-                              <AvatarFallback className="gradient-primary text-white text-sm">
-                                {getInitials(u.displayName)}
-                              </AvatarFallback>
+                            <Avatar className="w-8 h-8">
+                              <AvatarImage src={u.avatarUrl || undefined} />
+                              <AvatarFallback>{getInitials(u.displayName)}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium text-foreground">{u.displayName || 'Unknown'}</p>
-                              <p className="text-xs text-muted-foreground">{u.email}</p>
+                              <p className="font-medium text-foreground">
+                                {u.displayName || 'Unknown'}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{u.email}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -604,7 +648,7 @@ export default function AdminPage() {
                             className={cn(
                               'px-2 py-1 rounded text-xs font-medium',
                               u.role === 'admin'
-                                ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400'
+                                ? 'bg-primary/20 text-primary'
                                 : 'bg-muted text-muted-foreground'
                             )}
                           >
@@ -612,21 +656,26 @@ export default function AdminPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-wrap gap-1 max-w-md">
-                            {getSkillProgressBadges(u.skills).length > 0 ? (
-                              getSkillProgressBadges(u.skills)
-                            ) : (
-                              <span className="text-xs text-muted-foreground">No progress yet</span>
+                          <div className="flex flex-wrap gap-1">
+                            {getSkillProgressBadges(u.skillsProgress).slice(0, 3)}
+                            {getSkillProgressBadges(u.skillsProgress).length > 3 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{getSkillProgressBadges(u.skillsProgress).length - 3} more
+                              </span>
+                            )}
+                            {getSkillProgressBadges(u.skillsProgress).length === 0 && (
+                              <span className="text-xs text-muted-foreground">No progress</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className="font-semibold text-green-600 dark:text-green-400">
+                          <span className="font-semibold text-foreground">
                             {u.completedSkillsCount}
                           </span>
+                          <span className="text-muted-foreground">/{SKILL_LIST.length}</span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className="font-semibold text-primary">{u.credentialsCount}</span>
+                          <span className="font-semibold text-foreground">{u.credentialsCount}</span>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
@@ -652,13 +701,6 @@ export default function AdminPage() {
                 </Table>
               )}
             </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-border flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {filteredUsers.length} of {users.length} users
-              </p>
-            </div>
           </motion.div>
         </section>
       </div>
@@ -673,10 +715,10 @@ export default function AdminPage() {
           setSelectedUser(null);
           setSelectedUserCredentials([]);
         }}
+        isLoadingCredentials={isLoadingCredentials}
         onResetSkill={handleResetSkill}
         onIssueCredential={handleIssueCredential}
         onDeleteUser={handleDeleteUser}
-        adminUserId={user?.uid || ''}
       />
     </>
   );

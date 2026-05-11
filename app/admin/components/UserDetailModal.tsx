@@ -63,13 +63,13 @@ interface CredentialData {
 }
 
 interface UserData {
-  uid: string;
+  id: string;
   email: string | null;
   displayName: string | null;
-  photoURL: string | null;
+  avatarUrl: string | null;
   role: string;
   createdAt: Date;
-  skills: Record<string, { roundsCompleted?: number[]; finalScore?: number }>;
+  skillsProgress: Record<string, { roundsCompleted?: number[]; finalScore?: number }>;
 }
 
 interface UserDetailModalProps {
@@ -77,10 +77,10 @@ interface UserDetailModalProps {
   credentials: CredentialData[];
   isOpen: boolean;
   onClose: () => void;
+  isLoadingCredentials?: boolean;
   onResetSkill: (userId: string, skillId: SkillId) => Promise<void>;
   onIssueCredential: (userId: string, skillId: SkillId, skillName: string, finalScore: number, roundScores: Array<{ round: number; score: number; percentage: number }>) => Promise<void>;
   onDeleteUser: (userId: string) => Promise<void>;
-  adminUserId: string;
 }
 
 export default function UserDetailModal({
@@ -88,6 +88,7 @@ export default function UserDetailModal({
   credentials,
   isOpen,
   onClose,
+  isLoadingCredentials,
   onResetSkill,
   onIssueCredential,
   onDeleteUser,
@@ -116,7 +117,7 @@ export default function UserDetailModal({
   const handleResetSkill = async (skillId: SkillId) => {
     setIsResetting(skillId);
     try {
-      await onResetSkill(user.uid, skillId);
+      await onResetSkill(user.id, skillId);
     } finally {
       setIsResetting(null);
     }
@@ -138,7 +139,7 @@ export default function UserDetailModal({
         { round: 2, score: Math.round(issueFinalScore), percentage: Math.round(issueFinalScore) },
         { round: 3, score: Math.round(issueFinalScore * 1.05), percentage: Math.min(100, Math.round(issueFinalScore * 1.05)) },
       ];
-      await onIssueCredential(user.uid, issueSkillId, skill.name, issueFinalScore, roundScores);
+      await onIssueCredential(user.id, issueSkillId, skill.name, issueFinalScore, roundScores);
       setShowIssueDialog(false);
       setIssueSkillId('');
       setIssueFinalScore(85);
@@ -150,7 +151,7 @@ export default function UserDetailModal({
   const handleDeleteUser = async () => {
     setIsDeleting(true);
     try {
-      await onDeleteUser(user.uid);
+      await onDeleteUser(user.id);
       setShowDeleteConfirm(false);
       onClose();
     } finally {
@@ -159,7 +160,7 @@ export default function UserDetailModal({
   };
 
   const skillsWithProgress = SKILL_LIST.map((skill) => {
-    const progress = user.skills?.[skill.id] || {};
+    const progress = user.skillsProgress?.[skill.id] || {};
     const completedRounds = progress.roundsCompleted || [];
     const isComplete = getAllRoundsCompleted(completedRounds);
     const credential = credentials.find((c) => c.skillId === skill.id && !c.isRevoked);
@@ -199,7 +200,7 @@ export default function UserDetailModal({
               <div className="flex items-center justify-between border-b border-border p-6">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-14 w-14">
-                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+                    <AvatarImage src={user.avatarUrl || undefined} alt={user.displayName || 'User'} />
                     <AvatarFallback className="gradient-primary text-white text-lg">
                       {getInitials(user.displayName)}
                     </AvatarFallback>

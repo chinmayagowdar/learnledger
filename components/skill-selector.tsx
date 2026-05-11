@@ -15,8 +15,8 @@ export default function SkillSelector({ onSelectSkill, selectedSkillId }: SkillS
   const { user } = useAuth();
 
   const getSkillProgress = (skillId: string) => {
-    if (!user || !user.skills) return { completedRounds: [], isComplete: false };
-    const progress = user.skills[skillId];
+    if (!user || !user.skillsProgress) return { completedRounds: [], isComplete: false };
+    const progress = user.skillsProgress[skillId];
     if (!progress) return { completedRounds: [], isComplete: false };
     return {
       completedRounds: progress.roundsCompleted || [],

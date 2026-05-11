@@ -34,11 +34,11 @@ export default function LoginPage() {
       toast.success('Welcome back!');
       router.push('/');
     } catch (error: unknown) {
-      const firebaseError = error as { code?: string };
-      if (firebaseError.code === 'auth/invalid-credential') {
+      const supabaseError = error as { message?: string };
+      if (supabaseError.message?.includes('Invalid login credentials')) {
         toast.error('Invalid email or password');
-      } else if (firebaseError.code === 'auth/user-not-found') {
-        toast.error('No account found with this email');
+      } else if (supabaseError.message?.includes('Email not confirmed')) {
+        toast.error('Please confirm your email before signing in');
       } else {
         toast.error('Failed to sign in. Please try again.');
       }

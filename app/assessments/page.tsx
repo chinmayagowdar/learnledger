@@ -16,8 +16,8 @@ export default function AssessmentsPage() {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
 
   const getSkillProgress = (skillId: string) => {
-    if (!user || !user.skills) return [];
-    const progress = user.skills[skillId];
+    if (!user || !user.skillsProgress) return [];
+    const progress = user.skillsProgress[skillId];
     return progress?.roundsCompleted || [];
   };
 
