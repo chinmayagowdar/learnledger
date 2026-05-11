@@ -41,10 +41,16 @@ export default function VerificationPage() {
       const supabase = createClient();
 
       try {
-        // Fetch credential by hash (public access via RLS policy)
+        // Fetch credential by hash with user info (public access via RLS policy)
         const { data: cred, error: fetchError } = await supabase
           .from('credentials')
-          .select('*')
+          .select(`
+            *,
+            users:user_id (
+              email,
+              display_name
+            )
+          `)
           .eq('hash', hash)
           .single();
 
@@ -63,6 +69,10 @@ export default function VerificationPage() {
         // Get skill name
         const skill = SKILL_LIST.find(s => s.id === cred.skill_id);
 
+        // Get recipient name from joined user data
+        const userData = cred.users as { email?: string; display_name?: string } | null;
+        const recipientName = userData?.display_name || userData?.email?.split('@')[0] || 'Verified Credential Holder';
+
         setCredential({
           id: cred.id,
           skillId: cred.skill_id,
@@ -72,7 +82,7 @@ export default function VerificationPage() {
           issuedAt: cred.issued_at,
           roundScores: cred.round_scores || [],
           views: cred.views || 0,
-          recipientName: 'Verified Credential Holder',
+          recipientName,
         });
       } catch (err) {
         setError('Failed to verify credential. Please try again later.');

@@ -76,6 +76,8 @@ export async function verifyCredentialOnBlockchain(
 /**
  * Store credential hash on blockchain (mock implementation)
  * In production, this would interact with actual blockchain
+ * 
+ * Hash is computed as SHA-256 of: userId + skillId + finalScore + timestamp
  */
 export async function storeCredentialHash(data: {
   credentialId: string;
@@ -93,16 +95,16 @@ export async function storeCredentialHash(data: {
   // Simulate network delay for blockchain transaction
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  const hash = generateBlockchainHash({
-    credentialId: data.credentialId,
-    userId: data.recipientId,
-    timestamp: new Date().toISOString(),
-  });
+  const timestamp = new Date().toISOString();
+  
+  // Generate SHA-256 hash of userId + skillId + finalScore + timestamp
+  const hashInput = `${data.recipientId}${data.skillId}${Math.round(data.score)}${timestamp}`;
+  const hash = crypto.createHash('sha256').update(hashInput).digest('hex');
 
   return {
     blockchainHash: hash,
     transactionHash: `0x${hash.substring(0, 64)}`,
     blockNumber: Math.floor(Math.random() * 1000000) + 800000,
-    timestamp: new Date().toISOString(),
+    timestamp,
   };
 }

@@ -75,12 +75,16 @@ export default function RoundPage() {
       setCodingResults(new Array(problems.length).fill(false));
     }
 
-    // Check if camera was already approved for proctored round
-    if (config.type === 'proctored') {
-      const approved = sessionStorage.getItem('camera-approved') === 'true';
+    // Camera approval: Required for Round 1, reused for Rounds 2 and 3
+    // Once approved in Round 1, the session storage persists for subsequent rounds
+    const approved = sessionStorage.getItem('camera-approved') === 'true';
+    if (roundNumber === 1) {
+      // Round 1: Must have explicit camera approval
       setCameraApproved(approved);
     } else {
-      setCameraApproved(true);
+      // Rounds 2 & 3: Check if already approved (from Round 1)
+      // If not approved yet (e.g., user navigated directly), still require it
+      setCameraApproved(approved);
     }
 
     setIsLoading(false);
@@ -265,6 +269,21 @@ export default function RoundPage() {
           return;
         }
 
+        // Update skills_progress with credentialHash and status
+        const finalSkillsProgress = {
+          ...skillsProgress,
+          [skillId]: {
+            roundsCompleted: [1, 2, 3],
+            credentialHash: blockchainResult.blockchainHash,
+            status: 'completed',
+          },
+        };
+
+        await supabase
+          .from('users')
+          .update({ skills_progress: finalSkillsProgress })
+          .eq('id', user.id);
+
         toast.dismiss();
         toast.success('Credential issued successfully!');
         
@@ -292,8 +311,9 @@ export default function RoundPage() {
     );
   }
 
-  // Show camera approval for proctored round
-  if (roundConfig.type === 'proctored' && !cameraApproved) {
+  // Show camera approval for all rounds if not yet approved
+  // Camera is required before starting any assessment (enforced at Round 1)
+  if (!cameraApproved) {
     return (
       <CameraApproval
         onApprove={() => {
