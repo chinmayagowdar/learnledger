@@ -5,14 +5,27 @@ import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Copy, Share2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getCredentialByHash, incrementCredentialViews } from '@/lib/firebase-helpers';
+import { createClient } from '@/lib/supabase/client';
 import { getCredentialStatus } from '@/lib/blockchain-utils';
 import SkeletonLoader from '@/components/skeleton-loader';
+import { SKILL_LIST } from '@/lib/skills';
+
+interface Credential {
+  id: string;
+  skillId: string;
+  skillTitle: string;
+  finalScore: number;
+  hash: string;
+  issuedAt: string;
+  roundScores: number[];
+  views: number;
+  recipientName?: string;
+}
 
 export default function VerificationPage() {
   const params = useParams();
   const hash = params.hash as string;
-  const [credential, setCredential] = useState<any>(null);
+  const [credential, setCredential] = useState<Credential | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -25,31 +38,42 @@ export default function VerificationPage() {
         return;
       }
 
-      try {
-        // Try to get from Firebase
-        const cred = await getCredentialByHash(hash);
+      const supabase = createClient();
 
-        if (!cred) {
+      try {
+        // Fetch credential by hash (public access via RLS policy)
+        const { data: cred, error: fetchError } = await supabase
+          .from('credentials')
+          .select('*')
+          .eq('hash', hash)
+          .single();
+
+        if (fetchError || !cred) {
           setError('Credential not found. The hash may be invalid or the credential does not exist.');
           setLoading(false);
           return;
         }
 
         // Increment views
-        if (cred.id) {
-          await incrementCredentialViews(cred.id).catch(() => {});
-        }
+        await supabase
+          .from('credentials')
+          .update({ views: (cred.views || 0) + 1 })
+          .eq('id', cred.id);
 
-        // Transform Firestore timestamps to dates
-        const transformedCred = {
-          ...cred,
-          issuedAt: cred.issuedAt?.toDate?.() || new Date(cred.issuedAt),
-          expiresAt: cred.expiresAt?.toDate?.() || new Date(cred.expiresAt),
+        // Get skill name
+        const skill = SKILL_LIST.find(s => s.id === cred.skill_id);
+
+        setCredential({
+          id: cred.id,
+          skillId: cred.skill_id,
+          skillTitle: skill?.name || cred.skill_id,
+          finalScore: cred.final_score,
+          hash: cred.hash,
+          issuedAt: cred.issued_at,
+          roundScores: cred.round_scores || [],
+          views: cred.views || 0,
           recipientName: 'Verified Credential Holder',
-          score: cred.rounds?.reduce((acc: number, r: { percentage: number }) => acc + r.percentage, 0) / (cred.rounds?.length || 1),
-        };
-
-        setCredential(transformedCred);
+        });
       } catch (err) {
         setError('Failed to verify credential. Please try again later.');
         console.error('Error fetching credential:', err);
@@ -108,13 +132,18 @@ export default function VerificationPage() {
     );
   }
 
-  const status = getCredentialStatus(credential.expiresAt);
-  const issuedDate = new Date(credential.issuedAt).toLocaleDateString('en-US', {
+  // Calculate expiry (1 year from issue date)
+  const issuedDate = new Date(credential.issuedAt);
+  const expiresDate = new Date(issuedDate);
+  expiresDate.setFullYear(expiresDate.getFullYear() + 1);
+  
+  const status = getCredentialStatus(expiresDate.toISOString());
+  const formattedIssuedDate = issuedDate.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-  const expiresDate = new Date(credential.expiresAt).toLocaleDateString('en-US', {
+  const formattedExpiresDate = expiresDate.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -175,12 +204,12 @@ export default function VerificationPage() {
                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${credential.score}%` }}
+                      animate={{ width: `${credential.finalScore}%` }}
                       transition={{ duration: 0.8, delay: 0.3 }}
                       className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
                     />
                   </div>
-                  <p className="text-lg font-bold text-primary min-w-fit">{credential.score}%</p>
+                  <p className="text-lg font-bold text-primary min-w-fit">{credential.finalScore}%</p>
                 </div>
               </div>
 
@@ -188,7 +217,7 @@ export default function VerificationPage() {
                 <p className="text-xs uppercase tracking-wider text-foreground/50 font-semibold mb-2">
                   Issued Date
                 </p>
-                <p className="text-lg font-medium">{issuedDate}</p>
+                <p className="text-lg font-medium">{formattedIssuedDate}</p>
               </div>
 
               <div>
@@ -196,7 +225,7 @@ export default function VerificationPage() {
                   Expiration Date
                 </p>
                 <div className="flex items-center gap-2">
-                  <p className="text-lg font-medium">{expiresDate}</p>
+                  <p className="text-lg font-medium">{formattedExpiresDate}</p>
                   <span className={`
                     px-3 py-1 rounded-full text-xs font-semibold
                     ${status === 'active' ? 'bg-primary/20 text-primary' : status === 'expiring' ? 'bg-accent/20 text-accent' : 'bg-destructive/20 text-destructive'}
@@ -208,21 +237,23 @@ export default function VerificationPage() {
             </div>
 
             {/* Round Results */}
-            {credential.rounds && (
+            {credential.roundScores && credential.roundScores.length > 0 && (
               <div className="space-y-4 border-t border-foreground/10 pt-6">
                 <h3 className="text-xl font-bold">Assessment Results</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {credential.rounds.map((round: any) => (
+                  {credential.roundScores.map((score, index) => (
                     <motion.div
-                      key={round.round}
+                      key={index}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.3 + round.round * 0.1 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
                       className="glass p-4 rounded-lg text-center"
                     >
-                      <p className="text-sm text-foreground/60 mb-2">Round {round.round}</p>
-                      <p className="text-3xl font-bold text-primary">{round.percentage}%</p>
-                      <p className="text-xs text-foreground/50 mt-2">Score: {round.score}/{5}</p>
+                      <p className="text-sm text-foreground/60 mb-2">Round {index + 1}</p>
+                      <p className="text-3xl font-bold text-primary">{score}%</p>
+                      <p className="text-xs text-foreground/50 mt-2">
+                        {index === 0 ? 'MCQ' : index === 1 ? 'Coding' : 'Proctored'}
+                      </p>
                     </motion.div>
                   ))}
                 </div>
@@ -235,13 +266,13 @@ export default function VerificationPage() {
                 Blockchain Hash
               </p>
               <code className="block bg-muted/50 p-4 rounded-lg text-xs font-mono break-all text-foreground/70">
-                {credential.blockchainHash}
+                {credential.hash}
               </code>
             </div>
 
             {/* Stats */}
             <div className="flex items-center gap-4 text-sm text-foreground/60 border-t border-foreground/10 pt-6">
-              <div>Views: {credential.views || 0}</div>
+              <div>Views: {credential.views}</div>
             </div>
           </motion.div>
 
