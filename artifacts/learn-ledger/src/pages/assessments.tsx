@@ -1,15 +1,35 @@
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import AssessmentCard from '@/components/assessment-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/lib/auth-context';
+import { fetchUserAssessments } from '@/lib/supabase-data';
 
-const assessments = [
-  { id: 'react-advanced', title: 'React Advanced', description: 'Master advanced React patterns and hooks', progress: 100, status: 'completed' as const, duration: '15 min', questions: 5 },
-  { id: 'js-mastery', title: 'JavaScript Mastery', description: 'Deep dive into JavaScript fundamentals', progress: 65, status: 'in-progress' as const, duration: '20 min', questions: 5 },
-  { id: 'typescript-pro', title: 'TypeScript Pro', description: 'Advanced TypeScript patterns and types', progress: 30, status: 'in-progress' as const, duration: '18 min', questions: 5 },
-  { id: 'web-performance', title: 'Web Performance', description: 'Optimize web applications for speed', progress: 0, status: 'pending' as const, duration: '25 min', questions: 5 },
+const BASE_ASSESSMENTS = [
+  { id: 'react-advanced', title: 'React Advanced', description: 'Master advanced React patterns and hooks', duration: '30 min', questions: 15 },
+  { id: 'js-mastery', title: 'JavaScript Mastery', description: 'Deep dive into JavaScript fundamentals and engine internals', duration: '35 min', questions: 15 },
+  { id: 'typescript-pro', title: 'TypeScript Pro', description: 'Advanced TypeScript patterns and type system mastery', duration: '35 min', questions: 15 },
+  { id: 'web-performance', title: 'Web Performance', description: 'Optimize web applications for speed and Core Web Vitals', duration: '40 min', questions: 15 },
 ];
 
 export default function AssessmentsPage() {
+  const { user } = useAuth();
+  const [assessments, setAssessments] = useState(
+    BASE_ASSESSMENTS.map(a => ({ ...a, status: 'pending' as const, progress: 0 }))
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    fetchUserAssessments(user.id).then((rows: any[]) => {
+      setAssessments(BASE_ASSESSMENTS.map(base => {
+        const row = rows.find((r: any) => r.assessment_id === base.id);
+        const status = (row?.status ?? 'pending') as 'pending' | 'in-progress' | 'completed';
+        const progress = status === 'completed' ? 100 : status === 'in-progress' ? 50 : 0;
+        return { ...base, status, progress };
+      }));
+    });
+  }, [user?.id]);
+
   const completedCount = assessments.filter(a => a.status === 'completed').length;
   const inProgressCount = assessments.filter(a => a.status === 'in-progress').length;
 
@@ -18,7 +38,7 @@ export default function AssessmentsPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="space-y-4 mb-8">
           <h1 className="text-4xl sm:text-5xl font-bold">Assessments</h1>
-          <p className="text-lg text-foreground/70 max-w-2xl">Take assessments to validate your skills and earn verified credentials.</p>
+          <p className="text-lg text-foreground/70 max-w-2xl">Take 3 progressive rounds to validate your skills and earn verified credentials.</p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

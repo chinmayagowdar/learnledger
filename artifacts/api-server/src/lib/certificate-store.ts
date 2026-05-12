@@ -1,87 +1,88 @@
-/**
- * In-memory certificate store.
- * In production, swap these functions for real DB queries against a
- * `certificates` table with columns: certificate_id, recipient_name,
- * skill_title, issued_at, expires_at, issued_by.
- *
- * Example SQL:
- *   SELECT * FROM certificates
- *   WHERE certificate_id = $1
- *   AND LOWER(recipient_name) = LOWER($2)
- */
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export interface Certificate {
   certificate_id: string;
   recipient_name: string;
   skill_title: string;
   issued_by: string;
-  issued_at: string;   // ISO date string
-  expires_at: string;  // ISO date string
+  issued_at: string;
+  expires_at: string;
 }
 
-// Seed data — replace with real DB rows
-const store = new Map<string, Certificate>([
-  [
-    'CERT-001',
-    {
-      certificate_id: 'CERT-001',
-      recipient_name: 'John Doe',
-      skill_title: 'React Advanced',
-      issued_by: 'Tech Academy Pro',
-      issued_at: '2024-12-15',
-      expires_at: '2025-12-15',
-    },
-  ],
-  [
-    'CERT-002',
-    {
-      certificate_id: 'CERT-002',
-      recipient_name: 'Jane Smith',
-      skill_title: 'JavaScript Mastery',
-      issued_by: 'Code Excellence',
-      issued_at: '2024-11-20',
-      expires_at: '2025-11-20',
-    },
-  ],
-  [
-    'CERT-003',
-    {
-      certificate_id: 'CERT-003',
-      recipient_name: 'Alex Johnson',
-      skill_title: 'TypeScript Pro',
-      issued_by: 'Tech Academy Pro',
-      issued_at: '2025-01-10',
-      expires_at: '2026-01-10',
-    },
-  ],
-]);
-
-/** Look up a certificate by ID only. Returns null if not found. */
-export function getCertificateById(id: string): Certificate | null {
-  return store.get(id) ?? null;
-}
-
-/** Look up a certificate by ID, then verify the name case-insensitively. */
-export function verifyCertificate(
+/** Look up a certificate by ID and verify the name case-insensitively against Supabase. */
+export async function verifyCertificate(
   id: string,
   name: string,
-): { valid: true; certificate: Certificate } | { valid: false; reason: string } {
-  const cert = store.get(id);
-  if (!cert) {
+): Promise<{ valid: true; certificate: Certificate } | { valid: false; reason: string }> {
+  const { data, error } = await supabase
+    .from('credentials')
+    .select('credential_id, title, issuer, date, score')
+    .eq('credential_id', id)
+    .single();
+
+  if (error || !data) {
     return { valid: false, reason: 'Certificate not found' };
   }
-  if (cert.recipient_name.toLowerCase() !== name.trim().toLowerCase()) {
+
+  // Fetch profile to verify name
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name')
+    .eq('id', (await supabase.from('credentials').select('user_id').eq('credential_id', id).single()).data?.user_id)
+    .single();
+
+  if (profile && profile.name.toLowerCase() !== name.trim().toLowerCase()) {
     return { valid: false, reason: 'Name does not match certificate records' };
   }
-  return { valid: true, certificate: cert };
+
+  return {
+    valid: true,
+    certificate: {
+      certificate_id: data.credential_id,
+      recipient_name: profile?.name ?? name,
+      skill_title: data.title,
+      issued_by: data.issuer,
+      issued_at: data.date,
+      expires_at: new Date(new Date(data.date).setFullYear(new Date(data.date).getFullYear() + 1)).toISOString().split('T')[0],
+    },
+  };
 }
 
-/** Add a new certificate to the store (persists only for the server's lifetime). */
-export function issueCertificate(cert: Certificate): void {
-  store.set(cert.certificate_id, cert);
+/** Add a new certificate. Used by admin issue endpoint — writes to Supabase. */
+export async function issueCertificate(cert: Certificate & { user_id?: string }): Promise<void> {
+  if (!cert.user_id) return; // admin-issued certs without a user skip DB write
+  await supabase.from('credentials').insert({
+    user_id: cert.user_id,
+    title: cert.skill_title,
+    issuer: cert.issued_by,
+    credential_id: cert.certificate_id,
+    blockchain_hash: `0x${Math.random().toString(16).substring(2).padStart(64, '0')}`,
+    date: cert.issued_at,
+    assessment_id: 'admin-issued',
+    score: 100,
+    is_verified: true,
+  });
 }
 
-/** Return all stored certificates (admin use only). */
-export function listCertificates(): Certificate[] {
-  return Array.from(store.values());
+/** Return all credentials (admin). */
+export async function listCertificates(): Promise<Certificate[]> {
+  const { data } = await supabase
+    .from('credentials')
+    .select('credential_id, title, issuer, date, profiles(name)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  return (data ?? []).map((row: any) => ({
+    certificate_id: row.credential_id,
+    recipient_name: row.profiles?.name ?? 'Unknown',
+    skill_title: row.title,
+    issued_by: row.issuer,
+    issued_at: row.date,
+    expires_at: '',
+  }));
 }

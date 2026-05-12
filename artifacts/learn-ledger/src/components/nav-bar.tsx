@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Link, useLocation } from 'wouter';
-import { Moon, Sun, Menu, X } from 'lucide-react';
+import { Moon, Sun, Menu, X, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/auth-context';
 
 export default function NavBar() {
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [, navigate] = useLocation();
   const [location] = useLocation();
 
   useEffect(() => { setMounted(true); }, []);
@@ -22,6 +25,11 @@ export default function NavBar() {
   ];
 
   if (!mounted) return null;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/sign-in');
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 glass border-b">
@@ -46,18 +54,49 @@ export default function NavBar() {
                 {label}
               </Link>
             ))}
-            <Link
-              href="/admin/issue"
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors duration-200 ${location.startsWith('/admin') ? 'border-primary text-primary' : 'border-foreground/20 text-foreground/60 hover:text-foreground hover:border-foreground/40'}`}
-            >
-              Admin
-            </Link>
+            {user && (
+              <Link
+                href="/admin/issue"
+                className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors duration-200 ${location.startsWith('/admin') ? 'border-primary text-primary' : 'border-foreground/20 text-foreground/60 hover:text-foreground hover:border-foreground/40'}`}
+              >
+                Admin
+              </Link>
+            )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-lg" aria-label="Toggle theme">
               {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </Button>
+
+            {user ? (
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-sm">
+                  <User className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-foreground/80 max-w-[120px] truncate">
+                    {user.user_metadata?.name || user.email?.split('@')[0]}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSignOut}
+                  className="rounded-lg text-foreground/60 hover:text-red-400 hover:bg-red-500/10"
+                  title="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                onClick={() => navigate('/sign-in')}
+                size="sm"
+                className="rounded-lg bg-gradient-to-r from-primary to-accent text-white text-xs"
+              >
+                Sign In
+              </Button>
+            )}
+
             <button className="md:hidden p-2" onClick={() => setIsOpen(!isOpen)} aria-label="Toggle menu">
               {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -76,6 +115,14 @@ export default function NavBar() {
                 {label}
               </Link>
             ))}
+            {user && (
+              <button
+                onClick={() => { setIsOpen(false); handleSignOut(); }}
+                className="flex items-center gap-2 w-full px-4 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors text-sm"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out
+              </button>
+            )}
           </div>
         )}
       </div>

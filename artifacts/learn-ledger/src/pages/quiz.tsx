@@ -7,6 +7,8 @@ import QuizCard from '@/components/quiz-card';
 import SkeletonLoader from '@/components/skeleton-loader';
 import { Button } from '@/components/ui/button';
 import { mockAssessments, mockQuestionsByRound } from '@/lib/mock-data';
+import { saveCredential, saveRoundResult, upsertAssessmentStatus } from '@/lib/supabase-data';
+import { useAuth } from '@/lib/auth-context';
 import confetti from 'canvas-confetti';
 import type { Question } from '@/lib/store';
 
@@ -384,7 +386,8 @@ interface QuizPageProps {
 
 export default function QuizPage({ assessmentId }: QuizPageProps) {
   const [, navigate] = useLocation();
-  const { addCredential, updateAssessmentStatus, resetQuiz } = useLearnLedgerStore();
+  const { user } = useAuth();
+  const { resetQuiz } = useLearnLedgerStore();
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
 
   const assessment = mockAssessments.find((a) => a.id === assessmentId);
@@ -438,7 +441,7 @@ export default function QuizPage({ assessmentId }: QuizPageProps) {
 
   const handleRetry = () => dispatch({ type: 'RETRY_ROUND' });
 
-  const handleViewCredential = () => {
+  const handleViewCredential = async () => {
     const avgScore = Math.round(state.completedRounds.reduce((s, r) => s + r.percentage, 0) / state.completedRounds.length);
     const credential = {
       id: `cred-${Date.now()}`,
@@ -453,8 +456,18 @@ export default function QuizPage({ assessmentId }: QuizPageProps) {
       views: 0,
       shareCount: 0,
     };
-    addCredential(credential);
-    updateAssessmentStatus(assessment.id, 'completed', avgScore);
+
+    if (user) {
+      // Save credential + assessment status + round results to Supabase in parallel
+      await Promise.all([
+        saveCredential(user.id, credential),
+        upsertAssessmentStatus(user.id, assessment.id, 'completed', avgScore),
+        ...state.completedRounds.map((r) =>
+          saveRoundResult(user.id, assessment.id, r.round, r.score, r.total, r.percentage, r.passed)
+        ),
+      ]);
+    }
+
     navigate('/credentials');
   };
 
