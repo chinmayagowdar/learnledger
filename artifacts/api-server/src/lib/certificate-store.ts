@@ -1,9 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+let _supabase: SupabaseClient | null = null;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+function getSupabase(): SupabaseClient {
+  if (_supabase) return _supabase;
+  const url = process.env.SUPABASE_URL ?? '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+  const fullUrl = url.startsWith('http') ? url : `https://${url}.supabase.co`;
+  _supabase = createClient(fullUrl, key);
+  return _supabase;
+}
 
 export interface Certificate {
   certificate_id: string;
@@ -19,13 +25,15 @@ export async function verifyCertificate(
   id: string,
   name: string,
 ): Promise<{ valid: true; certificate: Certificate } | { valid: false; reason: string }> {
-  const { data, error } = await supabase
+  const supabase = getSupabase();
+
+  const { data: credData, error } = await supabase
     .from('credentials')
-    .select('credential_id, title, issuer, date, score')
+    .select('credential_id, title, issuer, date, score, user_id')
     .eq('credential_id', id)
     .single();
 
-  if (error || !data) {
+  if (error || !credData) {
     return { valid: false, reason: 'Certificate not found' };
   }
 
@@ -33,7 +41,7 @@ export async function verifyCertificate(
   const { data: profile } = await supabase
     .from('profiles')
     .select('name')
-    .eq('id', (await supabase.from('credentials').select('user_id').eq('credential_id', id).single()).data?.user_id)
+    .eq('id', credData.user_id)
     .single();
 
   if (profile && profile.name.toLowerCase() !== name.trim().toLowerCase()) {
@@ -43,19 +51,24 @@ export async function verifyCertificate(
   return {
     valid: true,
     certificate: {
-      certificate_id: data.credential_id,
+      certificate_id: credData.credential_id,
       recipient_name: profile?.name ?? name,
-      skill_title: data.title,
-      issued_by: data.issuer,
-      issued_at: data.date,
-      expires_at: new Date(new Date(data.date).setFullYear(new Date(data.date).getFullYear() + 1)).toISOString().split('T')[0],
+      skill_title: credData.title,
+      issued_by: credData.issuer,
+      issued_at: credData.date,
+      expires_at: new Date(
+        new Date(credData.date).setFullYear(new Date(credData.date).getFullYear() + 1),
+      )
+        .toISOString()
+        .split('T')[0],
     },
   };
 }
 
 /** Add a new certificate. Used by admin issue endpoint — writes to Supabase. */
 export async function issueCertificate(cert: Certificate & { user_id?: string }): Promise<void> {
-  if (!cert.user_id) return; // admin-issued certs without a user skip DB write
+  if (!cert.user_id) return;
+  const supabase = getSupabase();
   await supabase.from('credentials').insert({
     user_id: cert.user_id,
     title: cert.skill_title,
@@ -71,6 +84,7 @@ export async function issueCertificate(cert: Certificate & { user_id?: string })
 
 /** Return all credentials (admin). */
 export async function listCertificates(): Promise<Certificate[]> {
+  const supabase = getSupabase();
   const { data } = await supabase
     .from('credentials')
     .select('credential_id, title, issuer, date, profiles(name)')
