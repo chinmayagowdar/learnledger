@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminFirestore } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { createClient } from '@supabase/supabase-js';
+
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const { userId, skillId, adminUserId } = await request.json();
 
     if (!userId || !skillId || !adminUserId) {
@@ -13,11 +25,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getAdminFirestore();
-
     // Verify admin user has admin role
-    const adminDoc = await db.collection('users').doc(adminUserId).get();
-    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
+    const { data: adminUser, error: adminError } = await supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', adminUserId)
+      .single();
+
+    if (adminError || adminUser?.role !== 'admin') {
       return NextResponse.json(
         { error: 'Unauthorized: Admin privileges required' },
         { status: 403 }
@@ -25,10 +40,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user document
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('skills_progress')
+      .eq('id', userId)
+      .single();
 
-    if (!userDoc.exists) {
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -36,30 +54,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Reset skill progress
-    await userRef.update({
-      [`skills.${skillId}`]: { roundsCompleted: [] },
-    });
+    const skillsProgress = user.skills_progress || {};
+    skillsProgress[skillId] = { roundsCompleted: [] };
 
-    // Find and mark any credentials for this skill as revoked
-    const credentialsSnapshot = await db
-      .collection('credentials')
-      .where('userId', '==', userId)
-      .where('skillId', '==', skillId)
-      .get();
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({ skills_progress: skillsProgress })
+      .eq('id', userId);
 
-    const batch = db.batch();
-    credentialsSnapshot.docs.forEach((doc) => {
-      batch.update(doc.ref, { 
-        isRevoked: true, 
-        revokedAt: FieldValue.serverTimestamp(),
-        revokedBy: adminUserId,
-      });
-    });
-    await batch.commit();
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Delete any credentials for this skill
+    const { data: deletedCreds, error: deleteError } = await supabaseAdmin
+      .from('credentials')
+      .delete()
+      .eq('user_id', userId)
+      .eq('skill_id', skillId)
+      .select();
+
+    if (deleteError) {
+      console.warn('Error deleting credentials:', deleteError);
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Reset progress for skill ${skillId} and revoked ${credentialsSnapshot.size} credential(s)`,
+      message: `Reset progress for skill ${skillId} and deleted ${deletedCreds?.length || 0} credential(s)`,
     });
   } catch (error) {
     console.error('Error resetting progress:', error);

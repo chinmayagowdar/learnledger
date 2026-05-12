@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminFirestore } from '@/lib/firebase-admin';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { generateBlockchainHash } from '@/lib/blockchain';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+
+// Lazy initialization to avoid build-time errors
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey);
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     const { userId, skillId, skillName, finalScore, roundScores, adminUserId } = await request.json();
 
     if (!userId || !skillId || !skillName || finalScore === undefined || !roundScores || !adminUserId) {
@@ -14,11 +26,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getAdminFirestore();
-
     // Verify admin user has admin role
-    const adminDoc = await db.collection('users').doc(adminUserId).get();
-    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
+    const { data: adminUser, error: adminError } = await supabaseAdmin
+      .from('users')
+      .select('role')
+      .eq('id', adminUserId)
+      .single();
+
+    if (adminError || adminUser?.role !== 'admin') {
       return NextResponse.json(
         { error: 'Unauthorized: Admin privileges required' },
         { status: 403 }
@@ -26,55 +41,61 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user document
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('skills_progress')
+      .eq('id', userId)
+      .single();
 
-    if (!userDoc.exists) {
+    if (userError || !user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    // Generate blockchain hash
-    const blockchainHash = generateBlockchainHash({
-      credentialId: `cred-${userId}-${skillId}-${Date.now()}`,
-      recipientId: userId,
-      timestamp: new Date().toISOString(),
-    });
+    // Generate blockchain hash using SHA-256
+    const timestamp = new Date().toISOString();
+    const hashInput = `${userId}${skillId}${finalScore}${timestamp}`;
+    const blockchainHash = crypto.createHash('sha256').update(hashInput).digest('hex');
 
     // Create credential document
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/verify/${blockchainHash}`;
 
-    const credentialRef = await db.collection('credentials').add({
-      userId,
-      skillId,
-      skillTitle: skillName,
-      blockchainHash,
-      rounds: roundScores,
-      issuedAt: FieldValue.serverTimestamp(),
-      expiresAt: Timestamp.fromDate(expiresAt),
-      isVerified: true,
-      isManuallyIssued: true,
-      issuedBy: adminUserId,
-      views: 0,
-      shareCount: 0,
-    });
+    const { data: credential, error: credError } = await supabaseAdmin
+      .from('credentials')
+      .insert({
+        user_id: userId,
+        skill_id: skillId,
+        final_score: finalScore,
+        hash: blockchainHash,
+        verification_url: verificationUrl,
+        round_scores: roundScores.map((r: { percentage: number }) => Math.round(r.percentage)),
+        views: 0,
+      })
+      .select()
+      .single();
+
+    if (credError) {
+      throw credError;
+    }
 
     // Update user's skill progress to completed
-    await userRef.update({
-      [`skills.${skillId}`]: { 
-        roundsCompleted: [1, 2, 3],
-        finalScore,
-        credentialHash: blockchainHash,
-        completedAt: FieldValue.serverTimestamp(),
-      },
-    });
+    const skillsProgress = user.skills_progress || {};
+    skillsProgress[skillId] = {
+      roundsCompleted: [1, 2, 3],
+      credentialHash: blockchainHash,
+      status: 'completed',
+    };
+
+    await supabaseAdmin
+      .from('users')
+      .update({ skills_progress: skillsProgress })
+      .eq('id', userId);
 
     return NextResponse.json({
       success: true,
-      credentialId: credentialRef.id,
+      credentialId: credential.id,
       blockchainHash,
       message: `Credential issued for ${skillName}`,
     });

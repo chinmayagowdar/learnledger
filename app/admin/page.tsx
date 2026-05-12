@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Users, Award, BookOpen, Shield, Search, Filter, CheckCircle, Eye } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth, type AppUser } from '@/providers/AuthProvider';
 import { SKILL_LIST, getAllRoundsCompleted, type SkillId } from '@/lib/skills';
 import { Button } from '@/components/ui/button';
@@ -63,7 +62,12 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
 
-  const supabase = createClient();
+  // Lazy initialize supabase client only on client-side
+  const supabase = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const { createClient } = require('@/lib/supabase/client');
+    return createClient();
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !isAdmin) {
@@ -74,7 +78,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function fetchUsers() {
-      if (!isAdmin) return;
+      if (!isAdmin || !supabase) return;
 
       try {
         // Fetch users with their credentials count

@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+import type { User as SupabaseUser, SupabaseClient } from '@supabase/supabase-js';
 
 export type UserRole = 'user' | 'admin' | 'guest';
 
@@ -39,12 +39,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
 
-  const supabase = createClient();
-
-  const fetchUserProfile = useCallback(async (supabaseUser: SupabaseUser): Promise<AppUser | null> => {
+  // Initialize Supabase client on mount (client-side only)
+  useEffect(() => {
     try {
-      const { data, error } = await supabase
+      const client = createClient();
+      setSupabase(client);
+    } catch (error) {
+      console.error('Failed to initialize Supabase client:', error);
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchUserProfile = useCallback(async (supabaseUser: SupabaseUser, client: SupabaseClient): Promise<AppUser | null> => {
+    try {
+      const { data, error } = await client
         .from('users')
         .select('*')
         .eq('id', supabaseUser.id)
@@ -78,16 +88,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error in fetchUserProfile:', error);
       return null;
     }
-  }, [supabase]);
+  }, []);
 
   const refreshUser = useCallback(async () => {
-    if (supabaseUser) {
-      const appUser = await fetchUserProfile(supabaseUser);
+    if (supabaseUser && supabase) {
+      const appUser = await fetchUserProfile(supabaseUser, supabase);
       setUser(appUser);
     }
-  }, [supabaseUser, fetchUserProfile]);
+  }, [supabaseUser, supabase, fetchUserProfile]);
 
   useEffect(() => {
+    if (!supabase) return;
+
     // Get initial session
     const initializeAuth = async () => {
       try {
@@ -95,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           setSupabaseUser(session.user);
-          const appUser = await fetchUserProfile(session.user);
+          const appUser = await fetchUserProfile(session.user, supabase);
           setUser(appUser);
         }
       } catch (error) {
@@ -112,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         if (session?.user) {
           setSupabaseUser(session.user);
-          const appUser = await fetchUserProfile(session.user);
+          const appUser = await fetchUserProfile(session.user, supabase);
           setUser(appUser);
           setIsGuest(false);
         } else {
@@ -129,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, fetchUserProfile]);
 
   const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error('Supabase not initialized');
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -147,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
+    if (!supabase) throw new Error('Supabase not initialized');
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -157,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (data.user) {
         setSupabaseUser(data.user);
-        const appUser = await fetchUserProfile(data.user);
+        const appUser = await fetchUserProfile(data.user, supabase);
         setUser(appUser);
         setIsGuest(false);
       }
@@ -171,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUpWithEmail = useCallback(
     async (email: string, password: string, displayName: string) => {
+      if (!supabase) throw new Error('Supabase not initialized');
       setIsLoading(true);
       try {
         const { data, error } = await supabase.auth.signUp({
@@ -192,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSupabaseUser(data.user);
           // For users who don't need email confirmation:
           if (data.session) {
-            const appUser = await fetchUserProfile(data.user);
+            const appUser = await fetchUserProfile(data.user, supabase);
             setUser(appUser);
             setIsGuest(false);
           }
@@ -208,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    if (!supabase) throw new Error('Supabase not initialized');
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
@@ -241,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsGuest(false);
   }, []);
 
-  const value: AuthContextType = {
+  const value: AuthContextType = useMemo(() => ({
     user,
     supabaseUser,
     isLoading,
@@ -255,7 +271,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     enterGuestMode,
     exitGuestMode,
     refreshUser,
-  };
+  }), [
+    user,
+    supabaseUser,
+    isLoading,
+    isGuest,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    signOut,
+    enterGuestMode,
+    exitGuestMode,
+    refreshUser,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
