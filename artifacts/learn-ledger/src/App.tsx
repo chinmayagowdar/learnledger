@@ -15,6 +15,7 @@ import CredentialsPage from "@/pages/credentials";
 import SkillsPage from "@/pages/skills";
 import VerifyPage from "@/pages/verify";
 import VerifyHashPage from "@/pages/verify-hash";
+import AdminIssuePage from "@/pages/admin-issue";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/verify/:hash">
         {(params) => <AppLayout><VerifyHashPage hash={params.hash || ''} /></AppLayout>}
       </Route>
+      <Route path="/admin/issue" component={() => <AppLayout><AdminIssuePage /></AppLayout>} />
       <Route component={() => <AppLayout><NotFound /></AppLayout>} />
     </Switch>
   );

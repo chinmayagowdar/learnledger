@@ -18,6 +18,7 @@ export default function NavBar() {
     { href: '/', label: 'Dashboard' },
     { href: '/assessments', label: 'Assessments' },
     { href: '/credentials', label: 'Credentials' },
+    { href: '/verify', label: 'Verify' },
   ];
 
   if (!mounted) return null;
@@ -45,9 +46,12 @@ export default function NavBar() {
                 {label}
               </Link>
             ))}
-            <Button variant="outline" size="sm" className="rounded-lg">
-              Guest Demo
-            </Button>
+            <Link
+              href="/admin/issue"
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors duration-200 ${location.startsWith('/admin') ? 'border-primary text-primary' : 'border-foreground/20 text-foreground/60 hover:text-foreground hover:border-foreground/40'}`}
+            >
+              Admin
+            </Link>
           </div>
 
           <div className="flex items-center gap-4">
