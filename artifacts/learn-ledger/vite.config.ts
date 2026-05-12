@@ -51,7 +51,8 @@ export default defineConfig({
     fs: {
       strict: true,
     },
-    // Forward /api/* requests to the Express API server
+    // Expose Supabase secrets to the browser via VITE_ prefix
+    // (Vite only exposes VITE_* vars to client code)
     proxy: {
       "/api": {
         target: `http://localhost:${process.env.API_PORT ?? 8080}`,
