@@ -26,6 +26,7 @@ interface ParsedResumeData {
     degree: string;
     year: string;
   }>;
+  [key: string]: unknown;
 }
 
 export default function ResumeUploadPage() {
