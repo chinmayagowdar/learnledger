@@ -19,6 +19,9 @@ import VerifyHashPage from "@/pages/verify-hash";
 import AdminIssuePage from "@/pages/admin-issue";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import ResumeUploadPage from "@/pages/resume-upload";
+import ResumeResultPage from "@/pages/resume-result";
+import BlockExplorerPage from "@/pages/blockchain-explorer";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -95,6 +98,19 @@ function Router() {
       </Route>
       <Route path="/verify/:hash">
         {(params) => <AppLayout><VerifyHashPage hash={params.hash || ''} /></AppLayout>}
+      </Route>
+
+      {/* Public blockchain routes — no auth needed */}
+      <Route path="/blockchain/:txHash">
+        {(params) => <AppLayout><BlockExplorerPage txHash={params.txHash || ''} /></AppLayout>}
+      </Route>
+
+      {/* Resume routes - public upload, authenticated result */}
+      <Route path="/resume/upload">
+        <AppLayout><ResumeUploadPage /></AppLayout>
+      </Route>
+      <Route path="/resume/result/:id">
+        {(params) => <AppLayout><ResumeResultPage resumeId={params.id || ''} /></AppLayout>}
       </Route>
 
       {/* Protected routes */}

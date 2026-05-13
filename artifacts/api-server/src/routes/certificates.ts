@@ -1,11 +1,9 @@
 import { Router, type IRouter } from 'express';
 import QRCode from 'qrcode';
-import {
-  verifyCertificate,
-  issueCertificate,
-  listCertificates,
-  type Certificate,
-} from '../lib/certificate-store.js';
+import { supabase } from '../lib/supabase.js';
+import { simulateBlockchainRegistration, calculateHash } from '../lib/blockchain.js';
+import { logger } from '../lib/logger.js';
+import type { Database } from '../lib/supabase.js';
 
 const router: IRouter = Router();
 
@@ -16,7 +14,7 @@ const router: IRouter = Router();
  *   { valid: true,  details: Certificate }
  *   { valid: false, reason: string }
  */
-router.post('/verify-certificate', (req, res) => {
+router.post('/verify-certificate', async (req, res) => {
   const { id, name } = req.body ?? {};
 
   if (typeof id !== 'string' || !id.trim()) {
@@ -28,12 +26,34 @@ router.post('/verify-certificate', (req, res) => {
     return;
   }
 
-  const result = verifyCertificate(id.trim(), name.trim());
+  try {
+    const { data, error } = await supabase
+      .from('certificates')
+      .select('*')
+      .eq('certificate_id', id.trim())
+      .maybeSingle();
 
-  if (result.valid) {
-    res.json({ valid: true, details: result.certificate });
-  } else {
-    res.json({ valid: false, reason: result.reason });
+    if (error) {
+      logger.error('Database error', { error });
+      res.status(500).json({ valid: false, reason: 'Database error' });
+      return;
+    }
+
+    if (!data) {
+      res.json({ valid: false, reason: 'Certificate not found' });
+      return;
+    }
+
+    // Case-insensitive name matching
+    if (data.recipient_name.toLowerCase() !== name.trim().toLowerCase()) {
+      res.json({ valid: false, reason: 'Name does not match certificate records' });
+      return;
+    }
+
+    res.json({ valid: true, details: data });
+  } catch (err) {
+    logger.error('Verification error', { err });
+    res.status(500).json({ valid: false, reason: 'Internal server error' });
   }
 });
 
@@ -41,8 +61,6 @@ router.post('/verify-certificate', (req, res) => {
  * POST /api/issue-certificate
  * Body: { certificate_id, recipient_name, skill_title, issued_by, issued_at, expires_at }
  * Returns: { success: true, qrCodeDataUrl: string, certificate: Certificate }
- *
- * The QR code encodes: { "id": "CERT-123", "name": "John Doe" }
  */
 router.post('/issue-certificate', async (req, res) => {
   const { certificate_id, recipient_name, skill_title, issued_by, issued_at, expires_at } =
@@ -57,33 +75,69 @@ router.post('/issue-certificate', async (req, res) => {
     return;
   }
 
-  const cert: Certificate = {
-    certificate_id: String(certificate_id).trim(),
-    recipient_name: String(recipient_name).trim(),
-    skill_title: String(skill_title).trim(),
-    issued_by: String(issued_by || 'LearnLedger').trim(),
-    issued_at: String(issued_at || new Date().toISOString().split('T')[0]),
-    expires_at: String(
-      expires_at ||
-        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    ),
-  };
-
-  // Persist to in-memory store
-  issueCertificate(cert);
-
-  // Generate QR code that encodes { id, name } as JSON
-  const qrPayload = JSON.stringify({ id: cert.certificate_id, name: cert.recipient_name });
   try {
+    const certData: Database['public']['Tables']['certificates']['Insert'] = {
+      certificate_id: String(certificate_id).trim(),
+      recipient_name: String(recipient_name).trim(),
+      skill_title: String(skill_title).trim(),
+      issued_by: String(issued_by || 'LearnLedger').trim(),
+      issued_at: String(issued_at || new Date().toISOString().split('T')[0]),
+      expires_at: String(
+        expires_at ||
+          new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      ),
+    };
+
+    // Insert certificate into database
+    const { data: insertedCert, error: insertError } = await supabase
+      .from('certificates')
+      .insert(certData)
+      .select()
+      .single();
+
+    if (insertError) {
+      logger.error('Failed to insert certificate', { error: insertError });
+      res.status(500).json({ success: false, reason: 'Failed to issue certificate' });
+      return;
+    }
+
+    // Generate QR code
+    const qrPayload = JSON.stringify({
+      id: insertedCert.certificate_id,
+      name: insertedCert.recipient_name,
+    });
+
     const qrCodeDataUrl = await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: 'H',
       margin: 2,
       width: 300,
       color: { dark: '#000000', light: '#ffffff' },
     });
-    res.json({ success: true, qrCodeDataUrl, certificate: cert });
+
+    // Simulate blockchain registration
+    const documentHash = calculateHash(JSON.stringify(insertedCert));
+    const blockchainRecord = simulateBlockchainRegistration(documentHash, 'certificate', insertedCert.id);
+
+    // Update certificate with blockchain hash
+    await supabase
+      .from('certificates')
+      .update({ blockchain_hash: blockchainRecord.tx_hash })
+      .eq('id', insertedCert.id);
+
+    // Store blockchain record
+    await supabase.from('blockchain_records').insert({
+      ...blockchainRecord,
+      entity_id: insertedCert.id,
+    });
+
+    res.json({
+      success: true,
+      qrCodeDataUrl,
+      certificate: { ...insertedCert, blockchain_hash: blockchainRecord.tx_hash },
+    });
   } catch (err) {
-    res.status(500).json({ success: false, reason: 'Failed to generate QR code' });
+    logger.error('Certificate issuance error', { err });
+    res.status(500).json({ success: false, reason: 'Failed to issue certificate' });
   }
 });
 
@@ -91,8 +145,24 @@ router.post('/issue-certificate', async (req, res) => {
  * GET /api/certificates
  * Returns all issued certificates (admin only — add auth in production).
  */
-router.get('/certificates', (_req, res) => {
-  res.json({ certificates: listCertificates() });
+router.get('/certificates', async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('certificates')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      logger.error('Failed to fetch certificates', { error });
+      res.status(500).json({ success: false, error: 'Failed to fetch certificates' });
+      return;
+    }
+
+    res.json({ success: true, certificates: data || [] });
+  } catch (err) {
+    logger.error('Certificates fetch error', { err });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 export default router;

@@ -22,6 +22,7 @@ export default function NavBar() {
     { href: '/assessments', label: 'Assessments' },
     { href: '/credentials', label: 'Credentials' },
     { href: '/verify', label: 'Verify' },
+    { href: '/resume/upload', label: 'Upload Resume' },
   ];
 
   if (!mounted) return null;
