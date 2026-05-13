@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion } from 'framer-motion';
-import { ChevronLeft, LayoutDashboard, BookOpen, Award, Eye } from 'lucide-react';
+import { ChevronLeft, LayoutDashboard, BookOpen, Award, Eye, FileText } from 'lucide-react';
 
 interface SidebarProps {
   className?: string;
@@ -14,6 +14,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
   const navItems = [
     { href: '/', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', segment: '/' },
     { href: '/assessments', icon: <BookOpen className="w-5 h-5" />, label: 'Assessments', segment: 'assessments' },
+    { href: '/resume', icon: <FileText className="w-5 h-5" />, label: 'Resume', segment: 'resume' },
     { href: '/credentials', icon: <Award className="w-5 h-5" />, label: 'Credentials', segment: 'credentials' },
     { href: '/', icon: <Eye className="w-5 h-5" />, label: 'Employer View', segment: 'employer' },
   ];

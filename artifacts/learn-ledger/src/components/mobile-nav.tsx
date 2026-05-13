@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'wouter';
-import { BarChart3, FileText, Award } from 'lucide-react';
+import { BarChart3, FileText, Award, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function MobileNav() {
@@ -8,6 +8,7 @@ export default function MobileNav() {
   const navItems = [
     { href: '/', icon: BarChart3, label: 'Dashboard' },
     { href: '/assessments', icon: FileText, label: 'Assessments' },
+    { href: '/resume', icon: Upload, label: 'Resume' },
     { href: '/credentials', icon: Award, label: 'Credentials' },
   ];
 

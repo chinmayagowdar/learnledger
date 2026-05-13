@@ -123,3 +123,101 @@ export async function fetchProfile(userId: string) {
   if (error) { console.error('fetchProfile:', error); return null; }
   return data;
 }
+
+// ── Resumes ────────────────────────────────────────────────────────────────
+
+export interface ResumeRecord {
+  id: string;
+  user_id: string | null;
+  original_name: string;
+  file_hash: string;
+  file_size: number;
+  mime_type: string;
+  extracted_data: Record<string, unknown> | null;
+  score: number | null;
+  feedback: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createResume(
+  userId: string,
+  originalName: string,
+  fileHash: string,
+  fileSize: number,
+  mimeType: string,
+): Promise<ResumeRecord | null> {
+  const { data, error } = await supabase
+    .from('resumes')
+    .insert({
+      user_id: userId,
+      original_name: originalName,
+      file_hash: fileHash,
+      file_size: fileSize,
+      mime_type: mimeType,
+      status: 'pending',
+    })
+    .select()
+    .single();
+
+  if (error) { console.error('createResume:', error); return null; }
+  return data as ResumeRecord;
+}
+
+export async function updateResumeStatus(
+  resumeId: string,
+  status: 'pending' | 'processing' | 'completed' | 'error',
+  updates?: {
+    extracted_data?: Record<string, unknown>;
+    score?: number;
+    feedback?: string;
+    error_message?: string;
+  },
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('resumes')
+    .update({ status, ...updates })
+    .eq('id', resumeId);
+
+  if (error) { console.error('updateResumeStatus:', error); return false; }
+  return true;
+}
+
+export async function fetchResume(resumeId: string): Promise<ResumeRecord | null> {
+  const { data, error } = await supabase
+    .from('resumes')
+    .select('*')
+    .eq('id', resumeId)
+    .single();
+
+  if (error) { console.error('fetchResume:', error); return null; }
+  return data as ResumeRecord;
+}
+
+export async function fetchUserResumes(userId: string): Promise<ResumeRecord[]> {
+  const { data, error } = await supabase
+    .from('resumes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) { console.error('fetchUserResumes:', error); return []; }
+  return (data ?? []) as ResumeRecord[];
+}
+
+export async function verifyResumeByHash(
+  resumeId: string,
+  fileHash: string,
+): Promise<ResumeRecord | null> {
+  const { data, error } = await supabase
+    .from('resumes')
+    .select('*')
+    .eq('id', resumeId)
+    .eq('file_hash', fileHash)
+    .single();
+
+  if (error) { console.error('verifyResumeByHash:', error); return null; }
+  return data as ResumeRecord;
+}

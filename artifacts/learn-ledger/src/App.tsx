@@ -19,6 +19,8 @@ import VerifyHashPage from "@/pages/verify-hash";
 import AdminIssuePage from "@/pages/admin-issue";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import ResumeUploadPage from "@/pages/resume-upload";
+import ResumeResultPage from "@/pages/resume-result";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
 
@@ -105,6 +107,10 @@ function Router() {
       </Route>
       <Route path="/credentials" component={() => <ProtectedRoute component={CredentialsPage} />} />
       <Route path="/skills" component={() => <ProtectedRoute component={SkillsPage} />} />
+      <Route path="/resume" component={() => <ProtectedRoute component={ResumeUploadPage} />} />
+      <Route path="/resume/:id">
+        {(params) => <ProtectedRoute component={ResumeResultPage} resumeId={params.id || ''} />}
+      </Route>
       <Route path="/admin/issue" component={() => <ProtectedRoute component={AdminIssuePage} />} />
       <Route component={() => <AppLayout><NotFound /></AppLayout>} />
     </Switch>
