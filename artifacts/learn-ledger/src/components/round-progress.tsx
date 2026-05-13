@@ -8,7 +8,7 @@ interface RoundProgressProps {
 }
 
 export default function RoundProgress({ currentRound, totalRounds = 3, rounds = [] }: RoundProgressProps) {
-  const displayRounds = rounds.length > 0 ? rounds : Array.from({ length: totalRounds }, (_, i) => ({ round: i + 1, completed: i < currentRound - 1 }));
+  const displayRounds = rounds.length > 0 ? rounds : Array.from({ length: totalRounds }, (_, i) => ({ round: i + 1, completed: i < currentRound - 1, percentage: undefined }));
 
   return (
     <div className="w-full">

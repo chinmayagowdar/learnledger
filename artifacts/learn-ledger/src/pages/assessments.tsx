@@ -14,8 +14,16 @@ const BASE_ASSESSMENTS = [
 
 export default function AssessmentsPage() {
   const { user } = useAuth();
-  const [assessments, setAssessments] = useState(
-    BASE_ASSESSMENTS.map(a => ({ ...a, status: 'pending' as const, progress: 0 }))
+  const [assessments, setAssessments] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    duration: string;
+    questions: number;
+    status: 'pending' | 'in-progress' | 'completed';
+    progress: number;
+  }>>(
+    BASE_ASSESSMENTS.map(a => ({ ...a, status: 'pending', progress: 0 }))
   );
 
   useEffect(() => {
