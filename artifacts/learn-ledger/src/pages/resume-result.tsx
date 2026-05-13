@@ -5,7 +5,6 @@ import {
   Shield,
   CheckCircle,
   Copy,
-  ExternalLink,
   Award,
   Briefcase,
   GraduationCap,
@@ -20,7 +19,6 @@ import { useAuth } from '@/lib/auth-context';
 import { fetchResume, type ResumeRecord } from '@/lib/supabase-data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import SkeletonLoader from '@/components/skeleton-loader';
 
