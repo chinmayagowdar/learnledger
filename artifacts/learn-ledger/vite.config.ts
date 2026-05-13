@@ -59,7 +59,7 @@ export default defineConfig({
     // (Vite only exposes VITE_* vars to client code)
     proxy: {
       "/api": {
-        target: `http://localhost:${process.env.API_PORT ?? 8080}`,
+        target: `http://localhost:${process.env.API_PORT ?? 3001}`,
         changeOrigin: true,
         secure: false,
       },
