@@ -12,7 +12,7 @@ import {
   Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 
 interface ResumeData {
   id: string;
@@ -36,7 +36,7 @@ export default function ResumeResultPage({ resumeId }: { resumeId: string }) {
   const [resume, setResume] = useState<ResumeData | null>(null);
   const [blockchain, setBlockchain] = useState<BlockchainData | null>(null);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const fetchResumeData = async () => {
@@ -87,7 +87,7 @@ export default function ResumeResultPage({ resumeId }: { resumeId: string }) {
               <p className="text-sm text-foreground/70 mt-1">{error}</p>
             </div>
           </motion.div>
-          <Button onClick={() => navigate('/resume/upload')} className="rounded-lg">
+          <Button onClick={() => setLocation('/resume/upload')} className="rounded-lg">
             Back to Upload
           </Button>
         </div>
@@ -208,7 +208,7 @@ export default function ResumeResultPage({ resumeId }: { resumeId: string }) {
               </div>
 
               <Button
-                onClick={() => navigate(`/blockchain/${blockchain.tx_hash}`)}
+                onClick={() => setLocation(`/blockchain/${blockchain.tx_hash}`)}
                 variant="outline"
                 className="w-full rounded-lg"
               >
@@ -246,7 +246,7 @@ export default function ResumeResultPage({ resumeId }: { resumeId: string }) {
           <Button
             variant="ghost"
             className="flex-1 rounded-lg"
-            onClick={() => navigate('/resume/upload')}
+            onClick={() => setLocation('/resume/upload')}
           >
             Upload Another
           </Button>

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 
 interface UploadState {
   status: 'idle' | 'uploading' | 'processing' | 'success' | 'error';
@@ -16,7 +16,7 @@ export default function ResumeUploadPage() {
   const [fileContent, setFileContent] = useState('');
   const [userId] = useState('user-' + Math.random().toString(36).substr(2, 9)); // Mock user ID
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,7 +70,7 @@ export default function ResumeUploadPage() {
         });
         // Redirect to results page after 2 seconds
         setTimeout(() => {
-          navigate(`/resume/result/${data.resume.id}`);
+          setLocation(`/resume/result/${data.resume.id}`);
         }, 2000);
       } else {
         throw new Error(data.error || 'Unknown error occurred');

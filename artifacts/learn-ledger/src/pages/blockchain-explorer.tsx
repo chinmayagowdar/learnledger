@@ -10,7 +10,7 @@ import {
   Database,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 
 interface Transaction {
   tx_hash: string;
@@ -38,7 +38,7 @@ export default function BlockExplorerPage({ txHash }: { txHash: string }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<BlockExplorerData | null>(null);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,7 +93,7 @@ export default function BlockExplorerPage({ txHash }: { txHash: string }) {
               <p className="text-sm text-foreground/70 mt-1">{error}</p>
             </div>
           </motion.div>
-          <Button onClick={() => navigate('/')} className="rounded-lg">
+          <Button onClick={() => setLocation("/")}} className="rounded-lg">
             <Home className="w-4 h-4 mr-2" />
             Back Home
           </Button>
@@ -306,7 +306,7 @@ export default function BlockExplorerPage({ txHash }: { txHash: string }) {
           transition={{ delay: 0.5 }}
           className="flex flex-col sm:flex-row gap-4"
         >
-          <Button onClick={() => navigate('/')} variant="outline" className="flex-1 rounded-lg">
+          <Button onClick={() => setLocation("/")}} variant="outline" className="flex-1 rounded-lg">
             <Home className="w-4 h-4 mr-2" />
             Back Home
           </Button>
