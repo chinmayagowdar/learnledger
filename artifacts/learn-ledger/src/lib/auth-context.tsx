@@ -35,21 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, name: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    // The database trigger `on_auth_user_created` automatically creates a profile
+    // when a new user signs up, using the name from user metadata
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name } },
     });
     if (error) return { error: error.message };
-
-    if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        name,
-        email,
-        avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
-      });
-    }
     return { error: null };
   };
 
