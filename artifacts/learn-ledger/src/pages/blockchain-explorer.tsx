@@ -93,7 +93,7 @@ export default function BlockExplorerPage({ txHash }: { txHash: string }) {
               <p className="text-sm text-foreground/70 mt-1">{error}</p>
             </div>
           </motion.div>
-          <Button onClick={() => setLocation("/")}} className="rounded-lg">
+          <Button onClick={() => setLocation("/")} className="rounded-lg">
             <Home className="w-4 h-4 mr-2" />
             Back Home
           </Button>
@@ -306,7 +306,7 @@ export default function BlockExplorerPage({ txHash }: { txHash: string }) {
           transition={{ delay: 0.5 }}
           className="flex flex-col sm:flex-row gap-4"
         >
-          <Button onClick={() => setLocation("/")}} variant="outline" className="flex-1 rounded-lg">
+          <Button onClick={() => setLocation("/")} variant="outline" className="flex-1 rounded-lg">
             <Home className="w-4 h-4 mr-2" />
             Back Home
           </Button>
